@@ -27,6 +27,7 @@
     const VISUAL_WARN_SEC = 900;
     const SOUND_WARN_SEC = 120;
     const HAPPENING_TIMES = [36000, 79200];
+    const VERSION = '1.4.1';
 
     let _audioCtx = null;
 
@@ -52,7 +53,7 @@
     }
 
     function _loadOpts() {
-        try { return JSON.parse(GM_getValue('dio_ct_opts', '{}')); } catch (e) { return {}; }
+        try { return JSON.parse(GM_getValue('dark_ct_opts', '{}')); } catch (e) { return {}; }
     }
 
     let OPTIONS = (function () {
@@ -69,67 +70,93 @@
     })();
 
     function saveOpts() {
-        try { GM_setValue('dio_ct_opts', JSON.stringify(OPTIONS)); } catch (e) { console.warn('[DarkCmds] saveOpts:', e.message); }
+        try { GM_setValue('dark_ct_opts', JSON.stringify(OPTIONS)); } catch (e) { console.warn('[DarkCmds] saveOpts:', e.message); }
+    }
+
+    function _loadPanelPos() {
+        try { return JSON.parse(GM_getValue('dark_ct_panel_pos', 'null')); } catch (e) { return null; }
+    }
+
+    function _savePanelPos(left, top) {
+        try { GM_setValue('dark_ct_panel_pos', JSON.stringify({ left: Math.round(left), top: Math.round(top) })); } catch (e) {}
     }
 
     // ---- CSS ----
     function addStyles() {
-        $('<style id="dio_ct_styles">' +
-            '@keyframes dio_hap_pulse { 0% { color:#ff2222; opacity:1; text-shadow:0 0 6px #ffffff; transform:translateX(-50%) scale(1); } 25% { color:#ff0000; opacity:1; text-shadow:0 0 12px #ffffff,0 0 20px #ffffff; transform:translateX(-50%) scale(1.3); } 50% { color:#ff4444; opacity:1; text-shadow:0 0 6px #ffffff; transform:translateX(-50%) scale(1); } 75% { color:#ff0000; opacity:1; text-shadow:0 0 12px #ffffff,0 0 20px #ffffff; transform:translateX(-50%) scale(1.3); } 100% { color:#ff2222; opacity:1; text-shadow:0 0 6px #ffffff; transform:translateX(-50%) scale(1); } } ' +
-            '        .dio_hap_warning { animation:dio_hap_pulse 2s infinite; font-size:13px !important; } ' +
+        $('<style id="dark_ct_styles">' +
+            '@keyframes dark_hap_pulse { 0% { color:#ff2222; opacity:1; text-shadow:0 0 6px #ffffff; transform:translateX(-50%) scale(1); } 25% { color:#ff0000; opacity:1; text-shadow:0 0 12px #ffffff,0 0 20px #ffffff; transform:translateX(-50%) scale(1.3); } 50% { color:#ff4444; opacity:1; text-shadow:0 0 6px #ffffff; transform:translateX(-50%) scale(1); } 75% { color:#ff0000; opacity:1; text-shadow:0 0 12px #ffffff,0 0 20px #ffffff; transform:translateX(-50%) scale(1.3); } 100% { color:#ff2222; opacity:1; text-shadow:0 0 6px #ffffff; transform:translateX(-50%) scale(1); } } ' +
+            '        .dark_hap_warning { animation:dark_hap_pulse 2s infinite; font-size:13px !important; } ' +
 
-            '.dio_ct_settings { position:fixed; z-index:10000; width:320px; min-height:200px; background:linear-gradient(135deg,#1a1612 0%,#2d2519 100%); border:1px solid #5a4a32; border-radius:8px; box-shadow:0 4px 20px rgba(0,0,0,0.6); padding:0; color:#C4B998; font-family:Arial,sans-serif; font-size:12px; } ' +
-            '.dio_ct_settings .dio_ct_header { position:relative; padding:8px 12px; background:linear-gradient(180deg,#3d3224 0%,#2d2519 100%); border-bottom:1px solid #5a4a32; border-radius:8px 8px 0 0; font-size:14px; font-weight:bold; color:#FFD700; cursor:move; } ' +
-            '.dio_ct_settings .dio_ct_close { position:absolute; top:50%; right:8px; transform:translateY(-50%); width:26px; height:26px; color:#8a7a62; font-size:18px; font-weight:bold; cursor:pointer; text-align:center; line-height:26px; border-radius:4px; } ' +
-            '.dio_ct_settings .dio_ct_close:hover { color:#FFD700; background:rgba(255,255,255,0.1); } ' +
-            '.dio_ct_settings .dio_ct_body { padding:8px 12px 12px; } ' +
-            '.dio_ct_row { display:flex; align-items:center; justify-content:space-between; padding:6px 0; border-bottom:1px solid rgba(90,74,50,0.4); } ' +
-            '.dio_ct_row:last-child { border-bottom:none; } ' +
-            '.dio_ct_label { flex:1; font-size:12px; text-align:left; } ' +
-            '.dio_ct_desc { font-size:10px; color:#8a7a62; margin-top:1px; text-align:left; } ' +
-            '.dio_ct_row.dio_ct_disabled { opacity:0.55; } ' +
-            '.dio_ct_row.dio_ct_disabled .dio_ct_label { text-decoration:line-through; } ' +
-            '.dio_ct_toggle { position:relative; width:44px; height:22px; flex-shrink:0; margin-left:8px; cursor:pointer; background:#3d3224; border-radius:11px; border:1px solid #5a4a32; transition:background 0.2s; } ' +
-            '.dio_ct_toggle.on { background:#4a7a3a; border-color:#5a9a4a; } ' +
-            '.dio_ct_toggle .dio_ct_knob { position:absolute; top:1px; left:1px; width:18px; height:18px; background:#C4B998; border-radius:50%; transition:left 0.2s; } ' +
-            '.dio_ct_toggle.on .dio_ct_knob { left:23px; } ' +
-            '.dio_ct_btn_bar { position:fixed; bottom:10px; left:10px; z-index:9999; } ' +
-            '.dio_ct_btn_bar button { display:block; width:36px; height:36px; margin-bottom:4px; background:linear-gradient(180deg,#3d3224,#2d2519); border:1px solid #5a4a32; border-radius:6px; color:#FFD700; font-size:16px; cursor:pointer; line-height:1; padding:0; } ' +
-            '.dio_ct_btn_bar button:hover { background:#5a4a30; } ' +
+            '.dark_ct_settings { position:fixed; z-index:10000; width:320px; min-height:200px; background:linear-gradient(135deg,#1a1612 0%,#2d2519 100%); border:1px solid #5a4a32; border-radius:8px; box-shadow:0 4px 20px rgba(0,0,0,0.6); padding:0; color:#C4B998; font-family:Arial,sans-serif; font-size:12px; } ' +
+            '.dark_ct_settings .dark_ct_header { position:relative; padding:8px 12px; background:linear-gradient(180deg,#3d3224 0%,#2d2519 100%); border-bottom:1px solid #5a4a32; border-radius:8px 8px 0 0; font-size:14px; font-weight:bold; color:#FFD700; cursor:move; } ' +
+            '.dark_ct_settings .dark_ct_close { position:absolute; top:50%; right:8px; transform:translateY(-50%); width:26px; height:26px; color:#8a7a62; font-size:18px; font-weight:bold; cursor:pointer; text-align:center; line-height:26px; border-radius:4px; } ' +
+            '.dark_ct_settings .dark_ct_close:hover { color:#FFD700; background:rgba(255,255,255,0.1); } ' +
+            '.dark_ct_settings .dark_ct_body { padding:8px 12px 12px; } ' +
+            '.dark_ct_row { display:flex; align-items:center; justify-content:space-between; padding:6px 0; border-bottom:1px solid rgba(90,74,50,0.4); } ' +
+            '.dark_ct_row:last-child { border-bottom:none; } ' +
+            '.dark_ct_label { flex:1; font-size:12px; text-align:left; } ' +
+            '.dark_ct_desc { font-size:10px; color:#8a7a62; margin-top:1px; text-align:left; } ' +
+            '.dark_ct_row.dark_ct_disabled { opacity:0.55; } ' +
+            '.dark_ct_row.dark_ct_disabled .dark_ct_label { text-decoration:line-through; } ' +
+            '.dark_ct_toggle { position:relative; width:44px; height:22px; flex-shrink:0; margin-left:8px; cursor:pointer; background:#3d3224; border-radius:11px; border:1px solid #5a4a32; transition:background 0.2s; } ' +
+            '.dark_ct_toggle.on { background:#4a7a3a; border-color:#5a9a4a; } ' +
+            '.dark_ct_toggle .dark_ct_knob { position:absolute; top:1px; left:1px; width:18px; height:18px; background:#C4B998; border-radius:50%; transition:left 0.2s; } ' +
+            '.dark_ct_toggle.on .dark_ct_knob { left:23px; } ' +
+            '.dark_ct_btn_bar { position:fixed; bottom:10px; left:10px; z-index:9999; } ' +
+            '.dark_ct_btn_bar button { display:block; width:36px; height:36px; margin-bottom:4px; background:linear-gradient(180deg,#3d3224,#2d2519); border:1px solid #5a4a32; border-radius:6px; color:#FFD700; font-size:16px; cursor:pointer; line-height:1; padding:0; } ' +
+            '.dark_ct_btn_bar button:hover { background:#5a4a30; } ' +
             // Salvar Tropas toggle
-            '.attack_support_window .dio_dur_save_wrap { display:flex; align-items:center; gap:10px; padding:0; margin-left:auto; } ' +
-            '.attack_support_window .dio_dur_save_btn { display:inline-flex; align-items:center; cursor:pointer; background:none; border:none; padding:0; margin:0; } ' +
-            '.attack_support_window .dio_dur_save_btn .dio_track { position:relative; width:36px; height:20px; border-radius:10px; background:#3a3020; border:1px solid rgba(100,80,40,0.6); box-sizing:border-box; flex-shrink:0; } ' +
-            '.attack_support_window .dio_dur_save_btn .dio_track::after { content:""; position:absolute; top:2px; left:2px; width:14px; height:14px; border-radius:50%; background:#6b5b4a; transition:left 0.15s, background 0.15s; } ' +
-            '.attack_support_window .dio_dur_save_btn.active .dio_track { background:#5a4a30; border-color:rgba(120,100,60,0.7); } ' +
-            '.attack_support_window .dio_dur_save_btn.active .dio_track::after { left:18px; background:#FFD700; } ' +
-            '.attack_support_window .dio_dur_save_text { flex:1; min-width:0; } ' +
-            '.attack_support_window .dio_dur_save_label { display:block; font-weight:bold; font-size:12px; color:#1c1814; } ' +
-            '.attack_support_window .dio_dur_save_status { display:block; font-size:10px; font-weight:bold; margin-top:1px; } ' +
-            '.dio_autoload_wrap { display:inline-flex; align-items:center; margin-left:8px; } ' +
-            '.dio_autoload_btn { cursor:pointer; padding:3px 10px; font-size:11px; font-weight:bold; background:#5a4a30; color:#FFD700; border:1px solid rgba(120,100,60,0.7); border-radius:3px; } ' +
-            '.dio_autoload_btn:hover { background:#6a5a40; } ' +
-            '.dio_arrival { margin-left:10px; font-size:12px; color:#13487e; font-weight:bold; } ' +
+            '.attack_support_window .dark_dur_save_wrap { display:flex; align-items:center; gap:10px; padding:0; margin-left:auto; } ' +
+            '.attack_support_window .dark_dur_save_btn { display:inline-flex; align-items:center; cursor:pointer; background:none; border:none; padding:0; margin:0; } ' +
+            '.attack_support_window .dark_dur_save_btn .dark_track { position:relative; width:36px; height:20px; border-radius:10px; background:#3a3020; border:1px solid rgba(100,80,40,0.6); box-sizing:border-box; flex-shrink:0; } ' +
+            '.attack_support_window .dark_dur_save_btn .dark_track::after { content:""; position:absolute; top:2px; left:2px; width:14px; height:14px; border-radius:50%; background:#6b5b4a; transition:left 0.15s, background 0.15s; } ' +
+            '.attack_support_window .dark_dur_save_btn.active .dark_track { background:#5a4a30; border-color:rgba(120,100,60,0.7); } ' +
+            '.attack_support_window .dark_dur_save_btn.active .dark_track::after { left:18px; background:#FFD700; } ' +
+            '.attack_support_window .dark_dur_save_text { flex:1; min-width:0; } ' +
+            '.attack_support_window .dark_dur_save_label { display:block; font-weight:bold; font-size:12px; color:#1c1814; } ' +
+            '.attack_support_window .dark_dur_save_status { display:block; font-size:10px; font-weight:bold; margin-top:1px; } ' +
+            '.dark_autoload_wrap { display:inline-flex; align-items:center; margin-left:8px; } ' +
+            '.dark_autoload_btn { cursor:pointer; padding:3px 10px; font-size:11px; font-weight:bold; background:#5a4a30; color:#FFD700; border:1px solid rgba(120,100,60,0.7); border-radius:3px; } ' +
+            '.dark_autoload_btn:hover { background:#6a5a40; } ' +
+            '.dark_arrival { margin-left:10px; font-size:12px; color:#13487e; font-weight:bold; } ' +
 
             '</style>').appendTo('head');
     }
 
     function addBarButton() {
-        if ($('#dio_ct_btn_bar').length) return;
-        let bar = $('<div id="dio_ct_btn_bar" class="dio_ct_btn_bar"><button id="dio_ct_gear" title="Configurar Dark Commands">\u2699</button></div>');
+        if ($('#dark_ct_btn_bar').length) return;
+        let bar = $('<div id="dark_ct_btn_bar" class="dark_ct_btn_bar"><button id="dark_ct_gear" title="Configurar Dark Commands">\u2699</button></div>');
         bar.appendTo('body');
-        bar.on('click', '#dio_ct_gear', function () {
-            if ($('#dio_ct_panel').length) { $('#dio_ct_panel').remove(); return; }
+        bar.on('click', '#dark_ct_gear', function () {
+            let $panel = $('#dark_ct_panel');
+            if ($panel.length) {
+                $panel.toggle();
+                if ($panel.is(':visible')) _syncPanelState();
+                return;
+            }
             openSettings();
         });
     }
 
     function openSettings() {
-        $('#dio_ct_panel').remove();
-        let panel = $('<div id="dio_ct_panel" class="dio_ct_settings">');
-        let left = Math.max(0, Math.round((window.innerWidth - 320) / 2));
-        let top = Math.max(0, Math.round((window.innerHeight - 400) / 2));
-        panel.css({ left: left + 'px', top: top + 'px' });
+        let $panel = $('#dark_ct_panel');
+        if ($panel.length) {
+            $panel.show();
+            _syncPanelState();
+            return;
+        }
+
+        let savedPos = _loadPanelPos();
+        let left, top;
+        if (savedPos) {
+            left = savedPos.left;
+            top = savedPos.top;
+        } else {
+            left = Math.max(0, Math.round((window.innerWidth - 320) / 2));
+            top = Math.max(0, Math.round((window.innerHeight - 400) / 2));
+        }
+
+        let panel = $('<div id="dark_ct_panel" class="dark_ct_settings">').css({ left: left + 'px', top: top + 'px' });
 
         let rows = [
             { key: 'hideGPT', label: 'Ocultar GPT Time/Rank', desc: 'Remove gpt-time e gpt-rank da lista de comandos' },
@@ -140,38 +167,52 @@
             { key: 'loginDiario', label: 'Login Di\u00e1rio', desc: 'Contagem regressiva para reset do servidor no \u00edcone' },
             { key: 'happening', label: 'Happening', desc: 'Contagem regressiva 10h/22h no \u00edcone da copa' }
         ];
-        let html = '<div class="dio_ct_header"><span>Dark Commands</span><span class="dio_ct_close">\u2716</span></div><div class="dio_ct_body">';
-        for (let ri = 0; ri < rows.length; ri++) {
-            let r = rows[ri];
-            let on = OPTIONS[r.key] ? ' on' : '';
-            html += '<div class="dio_ct_row" data-key="' + r.key + '"><div><div class="dio_ct_label">' + r.label + '</div><div class="dio_ct_desc">' + r.desc + '</div></div><div class="dio_ct_toggle' + on + '"><div class="dio_ct_knob"></div></div></div>';
-        }
-        html += '</div>';
+
+        let html = `<div class="dark_ct_header"><span>Dark Commands v${VERSION}</span><span class="dark_ct_close">\u2716</span></div><div class="dark_ct_body">
+${rows.map(function (r) {
+    var on = OPTIONS[r.key] ? ' on' : '';
+    var st = OPTIONS[r.key] ? 'Ativado' : 'Desativado';
+    var sc = OPTIONS[r.key] ? '#4a7a3a' : '#8a7a62';
+    return '<div class="dark_ct_row" data-key="' + r.key + '"><div><div class="dark_ct_label">' + r.label + '</div><div class="dark_ct_desc">' + r.desc + '</div></div><div style="display:flex;align-items:center;gap:6px;"><span class="dark_ct_status" style="font-size:10px;font-weight:bold;color:' + sc + '">' + st + '</span><div class="dark_ct_toggle' + on + '"><div class="dark_ct_knob"></div></div></div></div>';
+}).join('')}
+</div>`;
+
         panel.html(html).appendTo('body');
         _updateSaveTroopsRow();
         _updateActBoxesRow();
 
-        panel.on('click', '.dio_ct_close', function () { $(document).off('.dio_ct_drag'); panel.remove(); });
-        panel.on('click', '.dio_ct_toggle', function () {
-            let key = $(this).closest('.dio_ct_row').data('key');
+        panel.on('click', '.dark_ct_close', function () { panel.hide(); });
+        panel.on('click', '.dark_ct_toggle', function () {
+            let key = $(this).closest('.dark_ct_row').data('key');
             OPTIONS[key] = !OPTIONS[key];
             $(this).toggleClass('on');
+            let $status = $(this).closest('.dark_ct_row').find('.dark_ct_status');
+            $status.text(OPTIONS[key] ? 'Ativado' : 'Desativado').css('color', OPTIONS[key] ? '#4a7a3a' : '#8a7a62');
             saveOpts();
             applyFeature(key);
         });
 
+        $(document).on('keydown.dark_ct_panel', function (e) {
+            if (e.key === 'Escape' && $('#dark_ct_panel').is(':visible')) {
+                $('#dark_ct_panel').hide();
+            }
+        });
+
         let dragData = null;
-        panel.on('mousedown', '.dio_ct_header', function (e) {
+        panel.on('mousedown', '.dark_ct_header', function (e) {
             dragData = { startX: e.clientX, startY: e.clientY, origLeft: left, origTop: top };
             e.preventDefault();
         });
-        $(document).on('mousemove.dio_ct_drag', function (e) {
+        $(document).on('mousemove.dark_ct_drag', function (e) {
             if (!dragData) return;
             left = Math.max(0, dragData.origLeft + (e.clientX - dragData.startX));
             top = Math.max(0, dragData.origTop + (e.clientY - dragData.startY));
             panel.css({ left: left + 'px', top: top + 'px' });
         });
-        $(document).on('mouseup.dio_ct_drag', function () { dragData = null; });
+        $(document).on('mouseup.dark_ct_drag', function () {
+            if (dragData) _savePanelPos(left, top);
+            dragData = null;
+        });
     }
 
     function _gptBotDetected() {
@@ -188,16 +229,16 @@
 
     function _updateConflictRow(dataKey, detectFn, disabledMsg, normalMsg) {
         let disabled = detectFn();
-        let $row = $('.dio_ct_row[data-key="' + dataKey + '"]');
+        let $row = $('.dark_ct_row[data-key="' + dataKey + '"]');
         if (!$row.length) return;
-        let $toggle = $row.find('.dio_ct_toggle');
-        let $desc = $row.find('.dio_ct_desc');
+        let $toggle = $row.find('.dark_ct_toggle');
+        let $desc = $row.find('.dark_ct_desc');
         if (disabled) {
-            $row.addClass('dio_ct_disabled');
+            $row.addClass('dark_ct_disabled');
             $toggle.removeClass('on').css({ opacity: 0.4, pointerEvents: 'none' });
             $desc.text(disabledMsg);
         } else {
-            $row.removeClass('dio_ct_disabled');
+            $row.removeClass('dark_ct_disabled');
             $toggle.css({ opacity: '', pointerEvents: '' });
             $desc.text(normalMsg);
         }
@@ -232,6 +273,18 @@
     let _trackGptBot = _trackConflict(_gptBotDetected, 'saveTroops', _updateSaveTroopsRow);
     let _trackDioTools = _trackConflict(_hasDioTools, 'actBoxes', _updateActBoxesRow);
 
+    function _syncPanelState() {
+        $('.dark_ct_row').each(function () {
+            let key = $(this).data('key');
+            if (key === undefined) return;
+            let on = OPTIONS[key];
+            $(this).find('.dark_ct_toggle').toggleClass('on', !!on);
+            $(this).find('.dark_ct_status').text(on ? 'Ativado' : 'Desativado').css('color', on ? '#4a7a3a' : '#8a7a62');
+        });
+        _updateSaveTroopsRow();
+        _updateActBoxesRow();
+    }
+
     function _allInputsEmpty(wndID) {
         let empty = true;
         $(wndID + ' input.unit_input').each(function () { if ($(this).val()) empty = false; });
@@ -246,8 +299,8 @@
 
     const FEATURES = {
         hideGPT: {
-            on: function () { if (!$('#dio_ct_hide_gpt').length) $('<style id="dio_ct_hide_gpt">#toolbar_activity_commands_list .gpt-time, #toolbar_activity_commands_list .gpt-rank { display:none !important; }</style>').appendTo('head'); },
-            off: function () { $('#dio_ct_hide_gpt').remove(); }
+            on: function () { if (!$('#dark_ct_hide_gpt').length) $('<style id="dark_ct_hide_gpt">#toolbar_activity_commands_list .gpt-time, #toolbar_activity_commands_list .gpt-rank { display:none !important; }</style>').appendTo('head'); },
+            off: function () { $('#dark_ct_hide_gpt').remove(); }
         },
         cmdArrival: { on: function () { CommandArrival.activate(); }, off: function () { CommandArrival.deactivate(); } },
         saveTroops: { on: function () { if (!_gptBotDetected()) SaveTroops.activate(); }, off: function () { SaveTroops.deactivate(); } },
@@ -296,7 +349,7 @@
                     let localSec = Math.floor(Date.now() / MS_PER_SEC) % SEC_PER_DAY;
                     let sec = ((localSec + self._offset) % SEC_PER_DAY + SEC_PER_DAY) % SEC_PER_DAY;
                     let remaining = config.calcRemaining(sec);
-                    if (remaining <= 0 || remaining > SEC_PER_HOUR) { $icon.find('.dio_hap_count').remove(); self._warnPlayed = false; return; }
+                    if (remaining <= 0 || remaining > SEC_PER_HOUR) { $icon.find('.dark_hap_count').remove(); self._warnPlayed = false; return; }
                     let h = Math.floor(remaining / SEC_PER_HOUR);
                     let m = Math.floor((remaining % SEC_PER_HOUR) / SEC_PER_MIN);
                     let s = remaining % SEC_PER_MIN;
@@ -315,9 +368,9 @@
                             if (self._tickCount >= 6) { clearInterval(self._warnTimer); self._warnTimer = null; }
                         }, 1000);
                     } else if (!soundWarn) { self._warnPlayed = false; if (self._warnTimer) { clearInterval(self._warnTimer); self._warnTimer = null; } }
-                    let $cnt = $icon.find('.dio_hap_count');
-                    if (!$cnt.length) $cnt = $('<span class="dio_hap_count" style="position:absolute;bottom:-14px;left:50%;transform:translateX(-50%);font-size:10px;font-weight:bold;white-space:nowrap;pointer-events:none;"></span>').appendTo($icon);
-                    $cnt.text(text).toggleClass('dio_hap_warning', visualWarn);
+                    let $cnt = $icon.find('.dark_hap_count');
+                    if (!$cnt.length) $cnt = $('<span class="dark_hap_count" style="position:absolute;bottom:-14px;left:50%;transform:translateX(-50%);font-size:10px;font-weight:bold;white-space:nowrap;pointer-events:none;"></span>').appendTo($icon);
+                    $cnt.text(text).toggleClass('dark_hap_warning', visualWarn);
                 };
                 self._timer = setInterval(tick, 1000);
                 self._visHandler = function () {
@@ -329,7 +382,7 @@
                 if (this._timer) { clearInterval(this._timer); this._timer = null; }
                 if (this._visHandler) { document.removeEventListener('visibilitychange', this._visHandler); this._visHandler = null; }
                 if (this._warnTimer) { clearInterval(this._warnTimer); this._warnTimer = null; }
-                $('.dio_hap_count').remove();
+                $('.dark_hap_count').remove();
             }
         };
     }
@@ -357,7 +410,7 @@
         activate: function () {
             if (CommandArrival._active) return;
             CommandArrival._active = true;
-            $(document).on('ajaxComplete.dio_ct_arrival', function (e, xhr, opt) {
+            $(document).on('ajaxComplete.dark_ct_arrival', function (e, xhr, opt) {
                 try {
                     let parsed = new URL(opt.url, window.location.origin);
                     if (parsed.pathname.indexOf('town_info') === -1) return;
@@ -374,9 +427,9 @@
         },
         deactivate: function () {
             CommandArrival._active = false;
-            $(document).off('ajaxComplete.dio_ct_arrival');
+            $(document).off('ajaxComplete.dark_ct_arrival');
             if (CommandArrival._observer) { CommandArrival._observer.disconnect(); CommandArrival._observer = null; }
-            $('.dio_arrival').remove();
+            $('.dark_arrival').remove();
         },
         _appendTimestamp: function (commandId) {
             let list = document.querySelectorAll('#toolbar_activity_commands_list > div > div.content > div');
@@ -395,7 +448,7 @@
             let list = document.querySelectorAll('#toolbar_activity_commands_list > div > div.content > div');
             for (let i = 0; i < list.length; i++) {
                 let ts = list[i].getAttribute('data-timestamp');
-                if (ts && !list[i].querySelector('.dio_arrival')) CommandArrival._insert(list[i]);
+                if (ts && !list[i].querySelector('.dark_arrival')) CommandArrival._insert(list[i]);
             }
         },
         _startObserver: function () {
@@ -407,10 +460,10 @@
         _insert: function (item) {
             try {
                 let wrapper = item.querySelector('div > .details_wrapper');
-                if (!wrapper || wrapper.querySelector('.dio_arrival')) return;
+                if (!wrapper || wrapper.querySelector('.dark_arrival')) return;
                 let timeDiv = wrapper.querySelector('.time');
                 let node = document.createElement('span');
-                node.className = 'dio_arrival';
+                node.className = 'dark_arrival';
                 node.textContent = CommandArrival._toTime(item.getAttribute('data-timestamp'));
                 if (timeDiv && timeDiv.nextSibling) wrapper.insertBefore(node, timeDiv.nextSibling);
                 else wrapper.appendChild(node);
@@ -428,7 +481,7 @@
         activate: function () { SaveTroops._active = true; },
         deactivate: function () {
             SaveTroops._active = false;
-            $('.dio_dur_save_wrap').remove();
+            $('.dark_dur_save_wrap').remove();
             for (let k in SaveTroops._timers) { clearInterval(SaveTroops._timers[k]); }
             SaveTroops._timers = {}; SaveTroops._savedUnits = {};
         },
@@ -437,18 +490,18 @@
             try {
                 if ($(wndID).length !== 1) {
                     document.querySelectorAll('.attack_support_window').forEach(function (el) {
-                        if (el.querySelector('.dio_dur_save_wrap')) return;
+                        if (el.querySelector('.dark_dur_save_wrap')) return;
                         let pid = el.parentElement.id;
                         SaveTroops.add('#' + pid);
                     });
                     return;
                 }
                 let $nu = _getUnitsContainer(wndID);
-                if (!$nu.length || $nu.find('.dio_dur_save_wrap').length) return;
+                if (!$nu.length || $nu.find('.dark_dur_save_wrap').length) return;
                 SaveTroops._savedUnits = {};
-                $nu.append('<div class="dio_dur_save_wrap active"><button type="button" class="dio_dur_save_btn active"><span class="dio_track"></span></button><div class="dio_dur_save_text"><span class="dio_dur_save_label">Salvar Tropas</span><span class="dio_dur_save_status" style="color:green">Ativado</span></div></div>');
-                let $btn = $nu.find('.dio_dur_save_btn');
-                let $status = $nu.find('.dio_dur_save_status');
+                $nu.append('<div class="dark_dur_save_wrap active"><button type="button" class="dark_dur_save_btn active"><span class="dark_track"></span></button><div class="dark_dur_save_text"><span class="dark_dur_save_label">Salvar Tropas</span><span class="dark_dur_save_status" style="color:green">Ativado</span></div></div>');
+                let $btn = $nu.find('.dark_dur_save_btn');
+                let $status = $nu.find('.dark_dur_save_status');
                 $btn.on('click', function () {
                     $(this).toggleClass('active');
                     if (!$(this).hasClass('active')) {
@@ -481,7 +534,7 @@
             }, 100);
         },
         _saveUnits: function (wndID) {
-            let btn = document.querySelector(wndID + ' .dio_dur_save_btn');
+            let btn = document.querySelector(wndID + ' .dark_dur_save_btn');
             if (btn && btn.classList.contains('active')) {
                 $(wndID + ' input.unit_input').each(function () {
                     let val = $(this).val();
@@ -521,7 +574,7 @@
         activate: function () { AutoLoad._active = true; },
         deactivate: function () {
             AutoLoad._active = false;
-            $('.dio_autoload_wrap').remove();
+            $('.dark_autoload_wrap').remove();
             for (let k in AutoLoad._pollers) { clearInterval(AutoLoad._pollers[k]); }
             AutoLoad._pollers = {};
         },
@@ -534,9 +587,9 @@
                 let $nu = _getUnitsContainer(wndID);
                 if (!$nu.length) return;
                 clearInterval(AutoLoad._pollers[key]); delete AutoLoad._pollers[key];
-                if ($nu.find('.dio_autoload_wrap').length) return;
-                $nu.append('<div class="dio_autoload_wrap"><button type="button" class="dio_autoload_btn" data-wnd="' + wndID + '">Auto</button></div>');
-                $nu.find('.dio_autoload_btn').on('click', function () { AutoLoad._fill($(this).data('wnd')); });
+                if ($nu.find('.dark_autoload_wrap').length) return;
+                $nu.append('<div class="dark_autoload_wrap"><button type="button" class="dark_autoload_btn" data-wnd="' + wndID + '">Auto</button></div>');
+                $nu.find('.dark_autoload_btn').on('click', function () { AutoLoad._fill($(this).data('wnd')); });
             }, 200);
         },
         _fill: function (wndID) {
@@ -614,17 +667,17 @@
         activate: function () {
             try {
                 let self = this;
-                $('<style id="dio_ab_style" type="text/css">' +
-                    '.dio_ab_disp {display: block !important; z-index: 5000 !important;}' +
-                    '.dio_ab_commands { height: 0px; overflow: visible!important; }' +
-                    '.dio_ab_menu {margin:6px 22px 2px 5px;height:11px;display:block;position:relative;}' +
-                    '.dio_ab_handle {cursor:-webkit-grab; width:100%;height:11px;position:absolute;background:url(data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAwAAAALCAYAAABLcGxfAAAACXBIWXMAAA7EAAAOxAGVKw4bAAAAUUlEQVQoz82PIQ7AMAwDHam/mg2H99biwWi/mpaSgXYgUtiOnWRwNpIXXtx9k5R6A/BgJfUG4P4MUreIQAUjeU6Nu6TUf/qhT42HpNTLSeXTA8/hO9nqHM5nAAAAAElFTkSuQmCC)}' +
-                    '.dio_ab_back {right:-18px;margin-top:-1px;width:16px;height:12px;position:absolute;background:url(data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAMCAYAAABr5z2BAAAACXBIWXMAAA7EAAAOxAGVKw4bAAAAhUlEQVQoz6WQwQ2EQAwDvStK4EEB18W6CwqgNgrgQQ++Lq4AyuADaLUkEej8ixTbkwCGSC54qK6Ze5KrEfj1AnLdapkBQFLxApLXWmmTNHpUKcKLgk5fPvA2y9DMg1WWvGc1d39IzjXJRVD7A5qfpCJpAjCYBGdi9HGLNj9ZjnQjeKu/CXZRWzfKHsl5pwAAAABJRU5ErkJggg==)}' +
-                    '#toolbar_activity_commands_list .dio_ab_menu {visibility: hidden; display: none;}' +
+                $('<style id="dark_ab_style" type="text/css">' +
+                    '.dark_ab_disp {display: block !important; z-index: 5000 !important;}' +
+                    '.dark_ab_commands { height: 0px; overflow: visible!important; }' +
+                    '.dark_ab_menu {margin:6px 22px 2px 5px;height:11px;display:block;position:relative;}' +
+                    '.dark_ab_handle {cursor:-webkit-grab; width:100%;height:11px;position:absolute;background:url(data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAwAAAALCAYAAABLcGxfAAAACXBIWXMAAA7EAAAOxAGVKw4bAAAAUUlEQVQoz82PIQ7AMAwDHam/mg2H99biwWi/mpaSgXYgUtiOnWRwNpIXXtx9k5R6A/BgJfUG4P4MUreIQAUjeU6Nu6TUf/qhT42HpNTLSeXTA8/hO9nqHM5nAAAAAElFTkSuQmCC)}' +
+                    '.dark_ab_back {right:-18px;margin-top:-1px;width:16px;height:12px;position:absolute;background:url(data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAMCAYAAABr5z2BAAAACXBIWXMAAA7EAAAOxAGVKw4bAAAAhUlEQVQoz6WQwQ2EQAwDvStK4EEB18W6CwqgNgrgQQ++Lq4AyuADaLUkEej8ixTbkwCGSC54qK6Ze5KrEfj1AnLdapkBQFLxApLXWmmTNHpUKcKLgk5fPvA2y9DMg1WWvGc1d39IzjXJRVD7A5qfpCJpAjCYBGdi9HGLNj9ZjnQjeKu/CXZRWzfKHsl5pwAAAABJRU5ErkJggg==)}' +
+                    '#toolbar_activity_commands_list .dark_ab_menu {visibility: hidden; display: none;}' +
                     '.dropdown-list .item_no_results, .dropdown-list.ui-draggable>div {cursor:text!important;}' +
                     '#toolbar_activity_commands_list .unit_movements .details_wrapper, #toolbar_activity_commands_list .unit_movements .icon { visibility: visible }' +
                     '#toolbar_activity_commands_list .cancel { display: none !important; }' +
-                    '#toolbar_activity_commands_list .js-dropdown-list:hover>.dio_ab_menu { display: block !important; visibility: visible; }' +
+                    '#toolbar_activity_commands_list .js-dropdown-list:hover>.dark_ab_menu { display: block !important; visibility: visible; }' +
                     '</style>').appendTo('head');
 
                 self._setupObserver();
@@ -645,13 +698,13 @@
                 }
                 self._observer = new MutationObserver(function (mutations) {
                     mutations.forEach(function (mutation) {
-                        if (tbCmd.style.display !== "none" || !tbCmd.classList.contains('dio_ab_commands')) return;
+                        if (tbCmd.style.display !== "none" || !tbCmd.classList.contains('dark_ab_commands')) return;
                         $('#toolbar_activity_commands').trigger('mouseenter');
                     });
                 });
                 self._observer.observe(tbCmd, { attributes: true, childList: true, subtree: true });
                 try { $.Observer(uw.GameEvents.command.send_unit).subscribe('DC_AB_TOOLBAR', function () {
-                    if (!tbCmd.classList.contains('dio_ab_commands')) return;
+                    if (!tbCmd.classList.contains('dark_ab_commands')) return;
                     $('#toolbar_activity_commands').trigger('mouseenter');
                 }); } catch (e) {}
             } catch (e) { console.error('[DarkCmds] _setupObserver error:', e); }
@@ -665,31 +718,31 @@
                     this._menuTimer = setTimeout(function () { self._setupMenu(); }, 1000);
                     return;
                 }
-                if ($('#dio_ab_cmd_menu').length == 0) {
-                    $cmdBox.append('<div id="dio_ab_cmd_menu" class="dio_ab_menu"><div id="dio_ab_cmd_handle" class="dio_ab_handle"></div><a class="dio_ab_back"></a></div>');
-                    $('#dio_ab_cmd_menu .dio_ab_back').on('click', function () { self._destroy(); });
+                if ($('#dark_ab_cmd_menu').length == 0) {
+                    $cmdBox.append('<div id="dark_ab_cmd_menu" class="dark_ab_menu"><div id="dark_ab_cmd_handle" class="dark_ab_handle"></div><a class="dark_ab_back"></a></div>');
+                    $('#dark_ab_cmd_menu .dark_ab_back').on('click', function () { self._destroy(); });
                 }
                 $cmdBox.draggable({
                     cursor: "move",
-                    handle: ".dio_ab_handle",
+                    handle: ".dark_ab_handle",
                     start: function () {
-                        $("#dio_ab_cmd_style").remove();
-                        $('#toolbar_activity_commands_list').addClass("dio_ab_disp").addClass("dio_ab_commands");
+                        $("#dark_ab_cmd_style").remove();
+                        $('#toolbar_activity_commands_list').addClass("dark_ab_disp").addClass("dark_ab_commands");
                         let pos = $cmdBox.position();
                         if (pos.left === 0 && pos.top === 0) $cmdBox[0].style.setProperty('top', '40px', 'important');
-                        $(".dio_ab_handle").css({ cursor: "grabbing" });
+                        $(".dark_ab_handle").css({ cursor: "grabbing" });
                     },
                     stop: function () {
-                        $(".dio_ab_handle").css({ cursor: "grab" });
+                        $(".dark_ab_handle").css({ cursor: "grab" });
                         let pos = $cmdBox.position();
-                        $('<style id="dio_ab_cmd_style" type="text/css">#toolbar_activity_commands_list .sandy-box {left: ' + pos.left + 'px !important; top: ' + pos.top + 'px !important;}</style>').appendTo('head');
+                        $('<style id="dark_ab_cmd_style" type="text/css">#toolbar_activity_commands_list .sandy-box {left: ' + pos.left + 'px !important; top: ' + pos.top + 'px !important;}</style>').appendTo('head');
                     }
                 });
             } catch (e) { console.error('[DarkCmds] _setupMenu error:', e); }
         },
         deactivate: function () {
-            $('#dio_ab_style, #dio_ab_cmd_style').remove();
-            $('#dio_ab_cmd_menu').remove();
+            $('#dark_ab_style, #dark_ab_cmd_style').remove();
+            $('#dark_ab_cmd_menu').remove();
             if (this._observer) { this._observer.disconnect(); this._observer = null; }
             if (this._obsTimer) { clearTimeout(this._obsTimer); this._obsTimer = null; }
             if (this._menuTimer) { clearTimeout(this._menuTimer); this._menuTimer = null; }
@@ -698,13 +751,13 @@
             $('#toolbar_activity_commands').off('dblclick.dc_ab');
         },
         _destroy: function () {
-            $("#dio_ab_cmd_menu").parent().parent().removeClass("dio_ab_disp");
-            $('#toolbar_activity_commands_list').removeClass("dio_ab_commands");
+            $("#dark_ab_cmd_menu").parent().parent().removeClass("dark_ab_disp");
+            $('#toolbar_activity_commands_list').removeClass("dark_ab_commands");
             let el = document.getElementById("toolbar_activity_commands_list");
             if (el) el.style.display = "none";
-            $('<style id="dio_ab_cmd_style" type="text/css">#toolbar_activity_commands_list .sandy-box {left:initial !important; top:initial !important; }</style>').appendTo('head');
+            $('<style id="dark_ab_cmd_style" type="text/css">#toolbar_activity_commands_list .sandy-box {left:initial !important; top:initial !important; }</style>').appendTo('head');
             $('#toolbar_activity_commands_list .cancel').click();
-            $("#dio_ab_cmd_style").remove();
+            $("#dark_ab_cmd_style").remove();
         }
     };
 
