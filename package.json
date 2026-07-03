@@ -1,6 +1,6 @@
 {
   "name": "dark-commands",
-  "version": "1.3.0",
+  "version": "1.4.2",
   "private": true,
   "scripts": {
     "build": "node build.js",

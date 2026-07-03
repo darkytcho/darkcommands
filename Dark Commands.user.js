@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Dark Commands
 // @namespace    https://github.com/
-// @version      1.4.1
+// @version      1.4.2
 // @author       Dark Rebel
 // @description  GPT Time/Rank hide, Chegada de Comandos, Salvar Tropas, AutoLoad, Login Diário, Happening
 // @match        https://*.grepolis.com/game/*
@@ -27,7 +27,7 @@
     const VISUAL_WARN_SEC = 900;
     const SOUND_WARN_SEC = 120;
     const HAPPENING_TIMES = [36000, 79200];
-    const VERSION = '1.4.1';
+    const VERSION = '1.4.2';
 
     let _audioCtx = null;
 
