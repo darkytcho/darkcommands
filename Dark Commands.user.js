@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Dark Commands
 // @namespace    https://github.com/
-// @version      1.4.0
+// @version      1.4.1
 // @author       Dark Rebel
 // @description  GPT Time/Rank hide, Chegada de Comandos, Salvar Tropas, AutoLoad, Login Diário, Happening
 // @match        https://*.grepolis.com/game/*
@@ -579,17 +579,17 @@
                     let totalCapAll = btAvail * bigCapT + stAvail * smallCapT;
                     if (totalCapAll >= totalPop) {
                         let needBig = 0, needSmall = 0, left = totalPop;
-                        if (btAvail > 0 && bigCapT > 0) { needBig = Math.min(btAvail, Math.ceil(left / bigCapT)); left -= needBig * bigCapT; if (left < 0) left = 0; }
-                        if (left > 0 && stAvail > 0 && smallCapT > 0) { needSmall = Math.min(stAvail, Math.ceil(left / smallCapT)); left -= needSmall * smallCapT; if (left < 0) left = 0; }
+                        if (stAvail > 0 && smallCapT > 0) { needSmall = Math.min(stAvail, Math.ceil(left / smallCapT)); left -= needSmall * smallCapT; if (left < 0) left = 0; }
+                        if (left > 0 && btAvail > 0 && bigCapT > 0) { needBig = Math.min(btAvail, Math.ceil(left / bigCapT)); left -= needBig * bigCapT; if (left < 0) left = 0; }
                         landUnits.forEach(function (lu) { fillInput(lu.id, lu.count); });
-                        if (needBig > 0) fillInput('big_transporter', needBig);
                         if (needSmall > 0) fillInput('small_transporter', needSmall);
+                        if (needBig > 0) fillInput('big_transporter', needBig);
                     } else {
                         landUnits.sort(function (a, b) { return a.pop - b.pop; });
                         let room = totalCapAll;
                         landUnits.forEach(function (lu) { let maxFit = Math.floor(room / lu.pop); let toFill = Math.min(maxFit, lu.count); if (toFill > 0) { fillInput(lu.id, toFill); room -= toFill * lu.pop; } });
-                        if (btAvail > 0) fillInput('big_transporter', btAvail);
                         if (stAvail > 0) fillInput('small_transporter', stAvail);
+                        if (btAvail > 0) fillInput('big_transporter', btAvail);
                     }
                 }
 
