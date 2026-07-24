@@ -1,15 +1,15 @@
 // ==UserScript==
 // @name         Dark Commands
 // @namespace    https://github.com/
-// @version      1.4.2
+// @version      1.4.3
 // @author       Dark Rebel
-// @description  GPT Time/Rank hide, Chegada de Comandos, Salvar Tropas, AutoLoad, Login Diário, Happening
+// @description  GPT Time/Rank hide, Chegada de Comandos, Salvar Tropas, AutoLoad, Login Diário
 // @match        https://*.grepolis.com/game/*
 // @grant        GM_getValue
 // @grant        GM_setValue
 // @grant        unsafeWindow
-// @updateURL   https://github.com/darkytcho/darkcommands/releases/latest/download/Dark.Commands.min.user.js
-// @downloadURL https://github.com/darkytcho/darkcommands/releases/latest/download/Dark.Commands.min.user.js
+// @updateURL   https://github.com/darkytcho/darkcommands/releases/latest/download/Dark.Commands.obf.user.js
+// @downloadURL https://github.com/darkytcho/darkcommands/releases/latest/download/Dark.Commands.obf.user.js
 // ==/UserScript==
 
 (function () {
