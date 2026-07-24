@@ -26,7 +26,7 @@
     const RESYNC_INTERVAL = 300;
     const VISUAL_WARN_SEC = 900;
     const SOUND_WARN_SEC = 120;
-    const VERSION = '1.4.2';
+    const VERSION = '1.4.3';
 
     let _audioCtx = null;
 

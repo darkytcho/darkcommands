@@ -1,5 +1,13 @@
 const fs = require('fs');
-const JavaScriptObfuscator = require('javascript-obfuscator');
+const Terser = require('terser');
+
+function xorEncode(str, key) {
+    let result = '';
+    for (let i = 0; i < str.length; i++) {
+        result += String.fromCharCode(str.charCodeAt(i) ^ key.charCodeAt(i % key.length));
+    }
+    return result;
+}
 
 async function main() {
     const src = fs.readFileSync('Dark Commands.user.js', 'utf8');
@@ -8,37 +16,15 @@ async function main() {
     const code = metaMatch ? src.slice(metaMatch[1].length) : src;
     const meta = metaMatch ? metaMatch[1] : '';
 
-    const result = JavaScriptObfuscator.obfuscate(code, {
-        compact: true,
-        controlFlowFlattening: true,
-        controlFlowFlatteningThreshold: 1,
-        deadCodeInjection: false,
-        identifierNamesGenerator: 'mangled-shuffled',
-        log: false,
-        numbersToExpressions: true,
-        renameGlobals: false,
-        selfDefending: false,
-        simplify: true,
-        splitStrings: true,
-        splitStringsChunkLength: 3,
-        stringArray: true,
-        stringArrayCallsTransform: true,
-        stringArrayCallsTransformThreshold: 1,
-        stringArrayEncoding: ['rc4'],
-        stringArrayIndexShift: true,
-        stringArrayRotate: true,
-        stringArrayShuffle: true,
-        stringArrayWrappersCount: 5,
-        stringArrayWrappersChainedCalls: true,
-        stringArrayWrappersParametersMaxCount: 5,
-        stringArrayWrappersType: 'function',
-        stringArrayThreshold: 1,
-        target: 'browser',
-        transformObjectKeys: true
-    });
+    const minified = await Terser.minify(code, { compress: true, mangle: true });
+    if (minified.error) throw minified.error;
 
-    const obfCode = result.getObfuscatedCode();
-    fs.writeFileSync('Dark Commands.obf.user.js', meta + '\n' + obfCode);
+    const key = 'd@rk' + Math.random().toString(36).slice(2, 6);
+    const encoded = Buffer.from(xorEncode(minified.code, key)).toString('base64');
+
+    const loader = `(function(){var k='${key}',d='',s=atob('${encoded}');for(var i=0;i<s.length;i++)d+=String.fromCharCode(s.charCodeAt(i)^k.charCodeAt(i%k.length));eval(d);})();`;
+
+    fs.writeFileSync('Dark Commands.obf.user.js', meta + '\n' + loader);
     const kb = (fs.statSync('Dark Commands.obf.user.js').size / 1024).toFixed(1);
     console.log(`✓ Obfuscated: ${kb} KB`);
 }
