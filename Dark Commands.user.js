@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Dark Commands
 // @namespace    https://github.com/
-// @version      1.4.4
+// @version      1.4.5
 // @author       Dark Rebel
 // @description  GPT Time/Rank hide, Chegada de Comandos, Salvar Tropas, AutoLoad, Login Diário
 // @match        https://*.grepolis.com/game/*
@@ -117,7 +117,7 @@
             '.dark_autoload_btn { cursor:pointer; padding:3px 10px; font-size:11px; font-weight:bold; background:#5a4a30; color:#FFD700; border:1px solid rgba(120,100,60,0.7); border-radius:3px; } ' +
             '.dark_autoload_btn:hover { background:#6a5a40; } ' +
             '.dark_arrival { margin-left:8px; font-size:11px; color:#13487e; font-weight:bold; white-space:nowrap; vertical-align:middle; } ' +
-            '#toolbar_activity_commands_list { min-width:250px !important; } ' +
+            '#toolbar_activity_commands_list { min-width:280px !important; } ' +
             '#toolbar_activity_commands_list .details_wrapper { overflow:visible !important; } ' +
 
             '</style>').appendTo('head');
@@ -477,7 +477,7 @@ ${rows.map(function (r) {
                 let node = document.createElement('span');
                 node.className = 'dark_arrival';
                 node.textContent = timeStr;
-                if (timeDiv && timeDiv.nextSibling) wrapper.insertBefore(node, timeDiv.nextSibling);
+                if (timeDiv) timeDiv.appendChild(node);
                 else wrapper.appendChild(node);
             } catch (e) { console.warn('[DarkCmds] _appendTimestamp:', e.message); }
         },
