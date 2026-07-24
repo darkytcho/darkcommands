@@ -26,7 +26,6 @@
     const RESYNC_INTERVAL = 300;
     const VISUAL_WARN_SEC = 900;
     const SOUND_WARN_SEC = 120;
-    const HAPPENING_TIMES = [36000, 79200];
     const VERSION = '1.4.2';
 
     let _audioCtx = null;
@@ -64,8 +63,7 @@
             cmdArrival: s.cmdArrival !== undefined ? s.cmdArrival : true,
             saveTroops: s.saveTroops !== undefined ? s.saveTroops : false,
             autoLoad: s.autoLoad !== undefined ? s.autoLoad : true,
-            loginDiario: s.loginDiario !== undefined ? s.loginDiario : true,
-            happening: s.happening !== undefined ? s.happening : true
+            loginDiario: s.loginDiario !== undefined ? s.loginDiario : true
         };
     })();
 
@@ -118,7 +116,9 @@
             '.dark_autoload_wrap { display:inline-flex; align-items:center; margin-left:8px; } ' +
             '.dark_autoload_btn { cursor:pointer; padding:3px 10px; font-size:11px; font-weight:bold; background:#5a4a30; color:#FFD700; border:1px solid rgba(120,100,60,0.7); border-radius:3px; } ' +
             '.dark_autoload_btn:hover { background:#6a5a40; } ' +
-            '.dark_arrival { margin-left:10px; font-size:12px; color:#13487e; font-weight:bold; } ' +
+            '.dark_arrival { margin-left:8px; font-size:11px; color:#13487e; font-weight:bold; white-space:nowrap; vertical-align:middle; } ' +
+            '#toolbar_activity_commands_list { min-width:250px !important; } ' +
+            '#toolbar_activity_commands_list .details_wrapper { overflow:visible !important; } ' +
 
             '</style>').appendTo('head');
     }
@@ -164,8 +164,7 @@
             { key: 'cmdArrival', label: 'Chegada de Comandos', desc: 'Mostra hor\u00e1rio de chegada na lista de comandos' },
             { key: 'saveTroops', label: 'Salvar Tropas', desc: 'Mantenha desativado se usar GPT-Bot-BR' },
             { key: 'autoLoad', label: 'AutoLoad', desc: 'Bot\u00e3o Auto para preencher tropas dispon\u00edveis' },
-            { key: 'loginDiario', label: 'Login Di\u00e1rio', desc: 'Contagem regressiva para reset do servidor no \u00edcone' },
-            { key: 'happening', label: 'Happening', desc: 'Contagem regressiva 10h/22h no \u00edcone da copa' }
+            { key: 'loginDiario', label: 'Login Di\u00e1rio', desc: 'Contagem regressiva para reset do servidor no \u00edcone' }
         ];
 
         let html = `<div class="dark_ct_header"><span>Dark Commands v${VERSION}</span><span class="dark_ct_close">\u2716</span></div><div class="dark_ct_body">
@@ -306,7 +305,6 @@ ${rows.map(function (r) {
         saveTroops: { on: function () { if (!_gptBotDetected()) SaveTroops.activate(); }, off: function () { SaveTroops.deactivate(); } },
         autoLoad: { on: function () { AutoLoad.activate(); }, off: function () { AutoLoad.deactivate(); } },
         loginDiario: { on: function () { DailyCountdown.activate(); }, off: function () { DailyCountdown.deactivate(); } },
-        happening: { on: function () { HappeningCountdown.activate(); }, off: function () { HappeningCountdown.deactivate(); } },
         actBoxes: { on: function () { if (!_hasDioTools()) ActivityBoxes.activate(); }, off: function () { ActivityBoxes.deactivate(); } }
     };
 
@@ -393,20 +391,9 @@ ${rows.map(function (r) {
         calcRemaining: function (sec) { return SEC_PER_DAY - sec; }
     });
 
-    let HappeningCountdown = _createCountdown({
-        $selector: function () { return $('#happening_large_icon.grepolympia.grepolympia_worldcup'); },
-        hiddenCheck: false,
-        calcRemaining: function (sec) {
-            let targets = HAPPENING_TIMES;
-            let next = Infinity;
-            for (let i = 0; i < targets.length; i++) { let t = targets[i]; let cand = sec < t ? t : t + SEC_PER_DAY; if (cand < next) next = cand; }
-            return next - sec;
-        }
-    });
-
     // ---- Chegada de Comandos ----
     let CommandArrival = {
-        _observer: null, _active: false,
+        _observer: null, _observerTarget: null, _active: false, _reconnectTimer: null,
         activate: function () {
             if (CommandArrival._active) return;
             CommandArrival._active = true;
@@ -424,47 +411,72 @@ ${rows.map(function (r) {
             });
             CommandArrival._process();
             CommandArrival._startObserver();
+            CommandArrival._startReconnect();
         },
         deactivate: function () {
             CommandArrival._active = false;
             $(document).off('ajaxComplete.dark_ct_arrival');
             if (CommandArrival._observer) { CommandArrival._observer.disconnect(); CommandArrival._observer = null; }
+            CommandArrival._observerTarget = null;
+            if (CommandArrival._reconnectTimer) { clearInterval(CommandArrival._reconnectTimer); CommandArrival._reconnectTimer = null; }
             $('.dark_arrival').remove();
         },
         _appendTimestamp: function (commandId) {
+            let cmdStr = commandId.toString();
             let list = document.querySelectorAll('#toolbar_activity_commands_list > div > div.content > div');
             for (let i = list.length - 1; i >= 0; i--) {
                 let id = list[i].getAttribute('id');
-                if (id) {
-                    let parts = id.split('_');
-                    if (parts.length > 1 && parts[1] === commandId.toString()) {
-                        CommandArrival._insert(list[i]);
-                        break;
-                    }
+                if (!id) continue;
+                let parts = id.split('_');
+                let last = parts[parts.length - 1];
+                if (last === cmdStr || (parts.length > 1 && parts[1] === cmdStr)) {
+                    CommandArrival._insert(list[i]);
+                    return;
                 }
             }
         },
         _process: function () {
             let list = document.querySelectorAll('#toolbar_activity_commands_list > div > div.content > div');
             for (let i = 0; i < list.length; i++) {
-                let ts = list[i].getAttribute('data-timestamp');
-                if (ts && !list[i].querySelector('.dark_arrival')) CommandArrival._insert(list[i]);
+                if (list[i].getAttribute('data-timestamp')) CommandArrival._insert(list[i]);
             }
         },
         _startObserver: function () {
             let target = document.querySelector('#toolbar_activity_commands_list > div > div.content');
             if (!target) { setTimeout(CommandArrival._startObserver, 1000); return; }
+            if (CommandArrival._observer) CommandArrival._observer.disconnect();
+            CommandArrival._observerTarget = target;
             CommandArrival._observer = new MutationObserver(function () { CommandArrival._process(); });
-            CommandArrival._observer.observe(target, { childList: true, subtree: true });
+            CommandArrival._observer.observe(target, { childList: true, subtree: true, attributes: true, attributeFilter: ['data-timestamp'] });
+        },
+        _startReconnect: function () {
+            if (CommandArrival._reconnectTimer) clearInterval(CommandArrival._reconnectTimer);
+            CommandArrival._reconnectTimer = setInterval(function () {
+                if (!CommandArrival._active) { clearInterval(CommandArrival._reconnectTimer); CommandArrival._reconnectTimer = null; return; }
+                let target = document.querySelector('#toolbar_activity_commands_list > div > div.content');
+                if (!target) return;
+                if (CommandArrival._observerTarget !== target) {
+                    CommandArrival._startObserver();
+                    CommandArrival._process();
+                }
+            }, 1500);
         },
         _insert: function (item) {
             try {
+                let ts = item.getAttribute('data-timestamp');
+                if (!ts) return;
                 let wrapper = item.querySelector('div > .details_wrapper');
-                if (!wrapper || wrapper.querySelector('.dark_arrival')) return;
+                if (!wrapper) return;
+                let timeStr = CommandArrival._toTime(ts);
+                let existing = wrapper.querySelector('.dark_arrival');
+                if (existing) {
+                    if (existing.textContent !== timeStr) existing.textContent = timeStr;
+                    return;
+                }
                 let timeDiv = wrapper.querySelector('.time');
                 let node = document.createElement('span');
                 node.className = 'dark_arrival';
-                node.textContent = CommandArrival._toTime(item.getAttribute('data-timestamp'));
+                node.textContent = timeStr;
                 if (timeDiv && timeDiv.nextSibling) wrapper.insertBefore(node, timeDiv.nextSibling);
                 else wrapper.appendChild(node);
             } catch (e) { console.warn('[DarkCmds] _appendTimestamp:', e.message); }
@@ -477,13 +489,13 @@ ${rows.map(function (r) {
 
     // ---- Salvar Tropas ----
     let SaveTroops = {
-        _savedUnits: {}, _timers: {}, _restoring: false, _active: false,
+        _saved: {}, _timers: {}, _restoring: false, _active: false,
         activate: function () { SaveTroops._active = true; },
         deactivate: function () {
             SaveTroops._active = false;
             $('.dark_dur_save_wrap').remove();
             for (let k in SaveTroops._timers) { clearInterval(SaveTroops._timers[k]); }
-            SaveTroops._timers = {}; SaveTroops._savedUnits = {};
+            SaveTroops._timers = {}; SaveTroops._saved = {};
         },
         add: function (wndID) {
             if (!SaveTroops._active || !OPTIONS.saveTroops) return;
@@ -496,50 +508,71 @@ ${rows.map(function (r) {
                     });
                     return;
                 }
+                let key = wndID.replace(/[^a-z0-9]/g, '_');
                 let $nu = _getUnitsContainer(wndID);
-                if (!$nu.length || $nu.find('.dark_dur_save_wrap').length) return;
-                SaveTroops._savedUnits = {};
-                $nu.append('<div class="dark_dur_save_wrap active"><button type="button" class="dark_dur_save_btn active"><span class="dark_track"></span></button><div class="dark_dur_save_text"><span class="dark_dur_save_label">Salvar Tropas</span><span class="dark_dur_save_status" style="color:green">Ativado</span></div></div>');
+                if (!$nu.length) {
+                    if (SaveTroops._timers[key]) return;
+                    let tries = 0;
+                    SaveTroops._timers[key] = setInterval(function () {
+                        if (!$(wndID).length || !OPTIONS.saveTroops || ++tries > 30) { clearInterval(SaveTroops._timers[key]); delete SaveTroops._timers[key]; return; }
+                        let $c = _getUnitsContainer(wndID);
+                        if (!$c.length) return;
+                        clearInterval(SaveTroops._timers[key]); delete SaveTroops._timers[key];
+                        SaveTroops.add(wndID);
+                    }, 300);
+                    return;
+                }
                 let $btn = $nu.find('.dark_dur_save_btn');
                 let $status = $nu.find('.dark_dur_save_status');
-                $btn.on('click', function () {
-                    $(this).toggleClass('active');
-                    if (!$(this).hasClass('active')) {
-                        SaveTroops._savedUnits = {};
-                        $status.text('Desativado').css('color', 'red');
-                    } else {
-                        SaveTroops._saveUnits(wndID);
-                        $status.text('Ativado').css('color', 'green');
-                    }
-                });
+                if (!$nu.find('.dark_dur_save_wrap').length) {
+                    $nu.append('<div class="dark_dur_save_wrap active"><button type="button" class="dark_dur_save_btn active"><span class="dark_track"></span></button><div class="dark_dur_save_text"><span class="dark_dur_save_label">Salvar Tropas</span><span class="dark_dur_save_status" style="color:green">Ativado</span></div></div>');
+                    $btn = $nu.find('.dark_dur_save_btn');
+                    $status = $nu.find('.dark_dur_save_status');
+                    $btn.off('.dark_save').on('click.dark_save', function () {
+                        $(this).toggleClass('active');
+                        if (!$(this).hasClass('active')) {
+                            delete SaveTroops._saved[wndID];
+                            $status.text('Desativado').css('color', 'red');
+                        } else {
+                            SaveTroops._saveUnits(wndID);
+                            $status.text('Ativado').css('color', 'green');
+                        }
+                    });
+                }
                 SaveTroops._initSaveUI(wndID, $btn);
             } catch (e) { console.error('[DarkCmds] SaveTroops error:', e); }
         },
         _initSaveUI: function (wndID, $btn) {
             let key = wndID.replace(/[^a-z0-9]/g, '_');
-            clearInterval(SaveTroops._timers[key]);
+            if (SaveTroops._timers[key]) { clearInterval(SaveTroops._timers[key]); delete SaveTroops._timers[key]; }
+            let tries = 0;
             SaveTroops._timers[key] = setInterval(function () {
+                if (!$(wndID).length || ++tries > 50) { clearInterval(SaveTroops._timers[key]); delete SaveTroops._timers[key]; return; }
                 if (!$(wndID + ' input.unit_input').length) return;
                 clearInterval(SaveTroops._timers[key]); delete SaveTroops._timers[key];
-                SaveTroops._restoreUnits(wndID);
-                $(wndID + ' input.unit_input').on('keyup change input', function () {
+                if (SaveTroops._saved[wndID]) SaveTroops._restoreUnits(wndID);
+                $(wndID + ' input.unit_input').off('.dark_save').on('keyup.dark_save change.dark_save input.dark_save', function () {
                     if ($btn.hasClass('active')) SaveTroops._saveUnits(wndID);
-                    if (!Object.keys(SaveTroops._savedUnits).length) return;
+                    if (!SaveTroops._saved[wndID] || !Object.keys(SaveTroops._saved[wndID]).length) return;
                     if (_allInputsEmpty(wndID)) SaveTroops._restoreUnits(wndID);
                 });
-                $(wndID + ' .button[onclick*="sendUnits"]').on('click', function () {
+                let $sendBtn = $(wndID + ' .button[onclick*="sendUnits"]');
+                if (!$sendBtn.length) $sendBtn = $(wndID + ' #btn_attack_town');
+                $sendBtn.off('.dark_save').on('click.dark_save', function () {
                     SaveTroops._saveUnits(wndID);
                     SaveTroops._onSendRestore(wndID);
                 });
-            }, 100);
+            }, 200);
         },
         _saveUnits: function (wndID) {
             let btn = document.querySelector(wndID + ' .dark_dur_save_btn');
             if (btn && btn.classList.contains('active')) {
+                let units = {};
                 $(wndID + ' input.unit_input').each(function () {
                     let val = $(this).val();
-                    if (val && parseInt(val, RADIX) > 0) SaveTroops._savedUnits[this.name] = val;
+                    if (val && parseInt(val, RADIX) > 0) units[this.name] = val;
                 });
+                if (Object.keys(units).length) SaveTroops._saved[wndID] = units;
             }
         },
         _onSendRestore: function (wndID) {
@@ -547,7 +580,8 @@ ${rows.map(function (r) {
             let check = setInterval(function () {
                 if (++tries > 15) { clearInterval(check); return; }
                 if (!$(wndID + ' input.unit_input').length) return;
-                if (!Object.keys(SaveTroops._savedUnits).length) { clearInterval(check); return; }
+                let saved = SaveTroops._saved[wndID];
+                if (!saved || !Object.keys(saved).length) { clearInterval(check); return; }
                 if (_allInputsEmpty(wndID)) {
                     clearInterval(check);
                     SaveTroops._restoreUnits(wndID);
@@ -558,12 +592,12 @@ ${rows.map(function (r) {
             if (SaveTroops._restoring) return;
             SaveTroops._restoring = true;
             try {
-                for (let unit in SaveTroops._savedUnits) {
-                    let val = SaveTroops._savedUnits[unit];
-                    if (val) { let $input = $(wndID + ' input[name="' + unit + '"]'); if ($input.length) $input.val(val); }
+                let saved = SaveTroops._saved[wndID];
+                if (!saved) return;
+                for (let unit in saved) {
+                    let val = saved[unit];
+                    if (val) { let $input = $(wndID + ' input[name="' + unit + '"]'); if ($input.length) $input.val(val).trigger('keyup'); }
                 }
-                let firstKey = Object.keys(SaveTroops._savedUnits).find(function (k) { return SaveTroops._savedUnits[k]; });
-                if (firstKey) { let $first = $(wndID + ' input[name="' + firstKey + '"]'); if ($first.length) $first.trigger('keyup'); }
             } catch (e) { console.warn('[DarkCmds] _restoreUnits:', e.message); } finally { SaveTroops._restoring = false; }
         }
     };
@@ -769,7 +803,7 @@ ${rows.map(function (r) {
                 let path = parsed.pathname.replace('/game/', '');
                 let actionType = parsed.searchParams.get('action') || '';
                 if (path !== 'town_info') return;
-                if (actionType === 'attack' || actionType === 'support') {
+                if (actionType === 'attack' || actionType === 'support' || actionType === 'attack_support' || actionType === 'send_units') {
                     TownTabHandler();
                 }
             } catch (e) { console.warn('[DarkCmds] ajaxObserver:', e.message); }
@@ -778,13 +812,18 @@ ${rows.map(function (r) {
 
     function TownTabHandler() {
         try {
-            let wndArray = uw.GPWindowMgr.getByType(uw.GPWindowMgr.TYPE_TOWN);
+            let wndArray = uw.GPWindowMgr.getAll ? uw.GPWindowMgr.getAll() : uw.GPWindowMgr.getByType(uw.GPWindowMgr.TYPE_TOWN);
             for (let e of wndArray) {
-                    let wndID = '#gpwnd_' + e.getID() + ' ';
-                    if (!$(wndID).get(0)) wndID = '#gpwnd_' + (e.getID() + 1) + ' ';
-                    if (OPTIONS.saveTroops) SaveTroops.add(wndID);
-                    if (OPTIONS.autoLoad) AutoLoad.add(wndID);
+                let wndID = '#gpwnd_' + e.getID() + ' ';
+                let $wnd = $(wndID);
+                if (!$wnd.length) {
+                    wndID = '#gpwnd_' + (e.getID() + 1) + ' ';
+                    $wnd = $(wndID);
                 }
+                if (!$wnd.length) continue;
+                if (OPTIONS.saveTroops) SaveTroops.add(wndID);
+                if (OPTIONS.autoLoad) AutoLoad.add(wndID);
+            }
         } catch (e) { console.error('[DarkCmds] TownTabHandler error:', e); }
     }
 

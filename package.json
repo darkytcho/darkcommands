@@ -7,6 +7,7 @@
     "release": "node build.js && git add -A && git commit -m \"release v$(node -p \"require('./package.json').version\")\" && git tag \"v$(node -p \"require('./package.json').version\")\" && git push && git push --tags"
   },
   "devDependencies": {
+    "javascript-obfuscator": "^5.5.0",
     "terser": "^5.48.0"
   }
 }
