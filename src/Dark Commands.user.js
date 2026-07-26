@@ -8,15 +8,18 @@
 // @grant        GM_getValue
 // @grant        GM_setValue
 // @grant        unsafeWindow
-// @updateURL   https://github.com/darkytcho/darkcommands/releases/latest/download/Dark.Commands.obf.user.js
-// @downloadURL https://github.com/darkytcho/darkcommands/releases/latest/download/Dark.Commands.obf.user.js
+// @updateURL    https://github.com/darkytcho/darkcommands/releases/latest/download/DarkCommands.obs.user.js
+// @downloadURL  https://github.com/darkytcho/darkcommands/releases/latest/download/DarkCommands.obs.user.js
 // ==/UserScript==
 
 (function () {
     'use strict';
 
-    let uw = typeof unsafeWindow !== 'undefined' ? unsafeWindow : window;
+    const uw = typeof unsafeWindow !== 'undefined' ? unsafeWindow : window;
 
+    // ========================
+    // Constantes
+    // ========================
     const MS_PER_SEC = 1000;
     const SEC_PER_MIN = 60;
     const SEC_PER_HOUR = 3600;
@@ -26,8 +29,11 @@
     const RESYNC_INTERVAL = 300;
     const VISUAL_WARN_SEC = 900;
     const SOUND_WARN_SEC = 120;
-    const VERSION = '1.4.4';
+    const VERSION = '1.4.5';
 
+    // ========================
+    // Audio (alertas sonoros)
+    // ========================
     let _audioCtx = null;
 
     function _unlockAudio() {
@@ -51,6 +57,9 @@
         osc.stop(_audioCtx.currentTime + 0.05);
     }
 
+    // ========================
+    // Configurações (preferências salvas)
+    // ========================
     function _loadOpts() {
         try { return JSON.parse(GM_getValue('dark_ct_opts', '{}')); } catch (e) { return {}; }
     }
@@ -79,7 +88,9 @@
         try { GM_setValue('dark_ct_panel_pos', JSON.stringify({ left: Math.round(left), top: Math.round(top) })); } catch (e) {}
     }
 
-    // ---- CSS ----
+    // ========================
+    // CSS
+    // ========================
     function addStyles() {
         $('<style id="dark_ct_styles">' +
             '@keyframes dark_hap_pulse { 0% { color:#ff2222; opacity:1; text-shadow:0 0 6px #ffffff; transform:translateX(-50%) scale(1); } 25% { color:#ff0000; opacity:1; text-shadow:0 0 12px #ffffff,0 0 20px #ffffff; transform:translateX(-50%) scale(1.3); } 50% { color:#ff4444; opacity:1; text-shadow:0 0 6px #ffffff; transform:translateX(-50%) scale(1); } 75% { color:#ff0000; opacity:1; text-shadow:0 0 12px #ffffff,0 0 20px #ffffff; transform:translateX(-50%) scale(1.3); } 100% { color:#ff2222; opacity:1; text-shadow:0 0 6px #ffffff; transform:translateX(-50%) scale(1); } } ' +
@@ -116,7 +127,7 @@
             '.dark_autoload_wrap { display:inline-flex; align-items:center; margin-left:8px; } ' +
             '.dark_autoload_btn { cursor:pointer; padding:3px 10px; font-size:11px; font-weight:bold; background:#5a4a30; color:#FFD700; border:1px solid rgba(120,100,60,0.7); border-radius:3px; } ' +
             '.dark_autoload_btn:hover { background:#6a5a40; } ' +
-            '.dark_arrival { margin-left:8px; font-size:11px; color:#13487e; font-weight:bold; white-space:nowrap; vertical-align:middle; } ' +
+            '.dark_arrival { margin-left:8px; font-size:14px; color:#13487e; font-weight:bold; white-space:nowrap; vertical-align:middle; } ' +
             '#toolbar_activity_commands_list { min-width:280px !important; } ' +
             '#toolbar_activity_commands_list .details_wrapper { overflow:visible !important; } ' +
 
@@ -214,6 +225,9 @@ ${rows.map(function (r) {
         });
     }
 
+    // ========================
+    // Detecção de conflitos
+    // ========================
     function _gptBotDetected() {
         return !!(
             typeof CryptoJS !== 'undefined' ||
@@ -247,25 +261,35 @@ ${rows.map(function (r) {
     let _updateActBoxesRow = function () { _updateConflictRow('actBoxes', _hasDioTools, 'Desativado \u2014 DIO Tools detectado', 'Mantenha desativado se usar DIO Tools'); };
 
     function _trackConflict(detectFn, optionKey, updateRowFn) {
-        let tracked = false;
+        let wasForcedOff = false;
         return function () {
-            if (tracked) return;
-            tracked = true;
-            function check() {
-                if (detectFn()) {
+            setInterval(function () {
+                let detected = detectFn();
+                let $row = $('.dark_ct_row[data-key="' + optionKey + '"]');
+                if (!$row.length) return;
+                let $toggle = $row.find('.dark_ct_toggle');
+                let $desc = $row.find('.dark_ct_desc');
+                if (detected) {
                     if (OPTIONS[optionKey]) {
                         OPTIONS[optionKey] = false;
                         saveOpts();
                         applyFeature(optionKey);
+                        wasForcedOff = true;
                     }
-                    updateRowFn();
-                    return true;
+                    $row.addClass('dark_ct_disabled');
+                    $toggle.removeClass('on').css({ opacity: 0.4, pointerEvents: 'none' });
+                    $desc.text('Desativado \u2014 GPT-Bot detectado');
+                } else if (wasForcedOff) {
+                    wasForcedOff = false;
+                    $row.removeClass('dark_ct_disabled');
+                    $toggle.css({ opacity: '', pointerEvents: '' });
+                    $desc.text('Mantenha desativado se usar GPT-Bot-BR');
+                    if (OPTIONS[optionKey]) {
+                        applyFeature(optionKey);
+                        $toggle.addClass('on');
+                    }
                 }
-                return false;
-            }
-            if (check()) return;
-            let observer = new MutationObserver(function () { if (check()) observer.disconnect(); });
-            observer.observe(document.body, { childList: true, subtree: true });
+            }, 3000);
         };
     }
 
@@ -288,6 +312,17 @@ ${rows.map(function (r) {
         let empty = true;
         $(wndID + ' input.unit_input').each(function () { if ($(this).val()) empty = false; });
         return empty;
+    }
+
+    function _getFormType(wndID) {
+        let $form = $(wndID + ' .send_units_form');
+        if ($form.hasClass('tab_type_attack')) return 'attack';
+        if ($form.hasClass('tab_type_support')) return 'support';
+        return 'unknown';
+    }
+
+    function _savedKey(wndID) {
+        return wndID.replace(/[^a-z0-9]/g, '_') + '_' + _getFormType(wndID);
     }
 
     function _getUnitsContainer(wndID) {
@@ -317,7 +352,9 @@ ${rows.map(function (r) {
         for (let k in OPTIONS) applyFeature(k);
     }
 
-    // ---- Server time ----
+    // ========================
+    // Server Time
+    // ========================
     function _syncServerOffset() {
         let stEl = $('.server_time_area').get(0);
         if (!stEl) return null;
@@ -331,7 +368,9 @@ ${rows.map(function (r) {
         return offset;
     }
 
-    // ---- Login Diário ----
+    // ========================
+    // Login Diário (countdown)
+    // ========================
     function _createCountdown(config) {
         return {
             _timer: null, _warnTimer: null, _tickCount: 0, _warnPlayed: false, _offset: null, _resyncTick: 0, _visHandler: null,
@@ -391,7 +430,9 @@ ${rows.map(function (r) {
         calcRemaining: function (sec) { return SEC_PER_DAY - sec; }
     });
 
-    // ---- Chegada de Comandos ----
+    // ========================
+    // Chegada de Comandos
+    // ========================
     let CommandArrival = {
         _observer: null, _observerTarget: null, _active: false, _reconnectTimer: null,
         activate: function () {
@@ -482,24 +523,51 @@ ${rows.map(function (r) {
             } catch (e) { console.warn('[DarkCmds] _appendTimestamp:', e.message); }
         },
         _toTime: function (ts) {
-            let tzOffset = new Date().getTimezoneOffset() * 60000;
-            return new Date(parseInt(ts, RADIX) * MS_PER_SEC - tzOffset).toISOString().slice(11, 19);
+            let d = new Date(parseInt(ts, RADIX) * MS_PER_SEC);
+            let h = d.getHours(), m = d.getMinutes(), s = d.getSeconds();
+            return (h < 10 ? '0' : '') + h + ':' + (m < 10 ? '0' : '') + m + ':' + (s < 10 ? '0' : '') + s;
         }
     };
 
-    // ---- Salvar Tropas ----
+    // ========================
+    // Salvar Tropas
+    // ========================
     let SaveTroops = {
-        _saved: {}, _timers: {}, _restoring: false, _active: false,
-        activate: function () { SaveTroops._active = true; },
+        _saved: {}, _timers: {}, _restoring: false, _active: false, _observers: {},
+        activate: function () {
+            SaveTroops._active = true;
+            SaveTroops._setupTabObserver();
+        },
         deactivate: function () {
             SaveTroops._active = false;
             $('.dark_dur_save_wrap').remove();
             for (let k in SaveTroops._timers) { clearInterval(SaveTroops._timers[k]); }
-            SaveTroops._timers = {}; SaveTroops._saved = {};
+            for (let k in SaveTroops._observers) { SaveTroops._observers[k].disconnect(); }
+            SaveTroops._timers = {}; SaveTroops._observers = {}; SaveTroops._saved = {};
+        },
+        _setupTabObserver: function () {
+            document.querySelectorAll('.attack_support_window').forEach(function (el) {
+                let pid = el.parentElement.id;
+                if (!pid || SaveTroops._observers[pid]) return;
+                let debounce = null;
+                SaveTroops._observers[pid] = new MutationObserver(function (mutations) {
+                    if (!SaveTroops._active || !OPTIONS.saveTroops) return;
+                    let relevant = false;
+                    for (let m of mutations) { if (m.type === 'childList') { relevant = true; break; } }
+                    if (!relevant) return;
+                    if (debounce) return;
+                    debounce = setTimeout(function () { debounce = null; }, 500);
+                    let wndID = '#' + pid + ' ';
+                    delete SaveTroops._saved[_savedKey(wndID)];
+                    SaveTroops.add(wndID);
+                });
+                SaveTroops._observers[pid].observe(el, { childList: true, subtree: true });
+            });
         },
         add: function (wndID) {
             if (!SaveTroops._active || !OPTIONS.saveTroops) return;
             try {
+                SaveTroops._setupTabObserver();
                 if ($(wndID).length !== 1) {
                     document.querySelectorAll('.attack_support_window').forEach(function (el) {
                         if (el.querySelector('.dark_dur_save_wrap')) return;
@@ -531,7 +599,7 @@ ${rows.map(function (r) {
                     $btn.off('.dark_save').on('click.dark_save', function () {
                         $(this).toggleClass('active');
                         if (!$(this).hasClass('active')) {
-                            delete SaveTroops._saved[wndID];
+                            delete SaveTroops._saved[_savedKey(wndID)];
                             $status.text('Desativado').css('color', 'red');
                         } else {
                             SaveTroops._saveUnits(wndID);
@@ -550,10 +618,10 @@ ${rows.map(function (r) {
                 if (!$(wndID).length || ++tries > 50) { clearInterval(SaveTroops._timers[key]); delete SaveTroops._timers[key]; return; }
                 if (!$(wndID + ' input.unit_input').length) return;
                 clearInterval(SaveTroops._timers[key]); delete SaveTroops._timers[key];
-                if (SaveTroops._saved[wndID]) SaveTroops._restoreUnits(wndID);
+                if (SaveTroops._saved[_savedKey(wndID)]) SaveTroops._restoreUnits(wndID);
                 $(wndID + ' input.unit_input').off('.dark_save').on('keyup.dark_save change.dark_save input.dark_save', function () {
                     if ($btn.hasClass('active')) SaveTroops._saveUnits(wndID);
-                    if (!SaveTroops._saved[wndID] || !Object.keys(SaveTroops._saved[wndID]).length) return;
+                    if (!SaveTroops._saved[_savedKey(wndID)] || !Object.keys(SaveTroops._saved[_savedKey(wndID)]).length) return;
                     if (_allInputsEmpty(wndID)) SaveTroops._restoreUnits(wndID);
                 });
                 let $sendBtn = $(wndID + ' .button[onclick*="sendUnits"]');
@@ -572,7 +640,7 @@ ${rows.map(function (r) {
                     let val = $(this).val();
                     if (val && parseInt(val, RADIX) > 0) units[this.name] = val;
                 });
-                if (Object.keys(units).length) SaveTroops._saved[wndID] = units;
+                if (Object.keys(units).length) SaveTroops._saved[_savedKey(wndID)] = units;
             }
         },
         _onSendRestore: function (wndID) {
@@ -580,7 +648,7 @@ ${rows.map(function (r) {
             let check = setInterval(function () {
                 if (++tries > 15) { clearInterval(check); return; }
                 if (!$(wndID + ' input.unit_input').length) return;
-                let saved = SaveTroops._saved[wndID];
+                let saved = SaveTroops._saved[_savedKey(wndID)];
                 if (!saved || !Object.keys(saved).length) { clearInterval(check); return; }
                 if (_allInputsEmpty(wndID)) {
                     clearInterval(check);
@@ -592,7 +660,7 @@ ${rows.map(function (r) {
             if (SaveTroops._restoring) return;
             SaveTroops._restoring = true;
             try {
-                let saved = SaveTroops._saved[wndID];
+                let saved = SaveTroops._saved[_savedKey(wndID)];
                 if (!saved) return;
                 for (let unit in saved) {
                     let val = saved[unit];
@@ -602,7 +670,9 @@ ${rows.map(function (r) {
         }
     };
 
-    // ---- AutoLoad ----
+    // ========================
+    // AutoLoad
+    // ========================
     let AutoLoad = {
         _pollers: {}, _active: false,
         activate: function () { AutoLoad._active = true; },
@@ -695,7 +765,9 @@ ${rows.map(function (r) {
         }
     };
 
-    // ---- ActivityBoxes (Caixas de comércio e ataque) ----
+    // ========================
+    // ActivityBoxes (Caixas de comércio e ataque)
+    // ========================
     let ActivityBoxes = {
         _observer: null, _obsTimer: null, _menuTimer: null,
         activate: function () {
@@ -795,7 +867,9 @@ ${rows.map(function (r) {
         }
     };
 
-    // ---- AJAX-based window detection ----
+    // ========================
+    // AJAX-based window detection
+    // ========================
     function ajaxObserver() {
         $(document).ajaxComplete(function (e, xhr, opt) {
             try {
@@ -827,7 +901,9 @@ ${rows.map(function (r) {
         } catch (e) { console.error('[DarkCmds] TownTabHandler error:', e); }
     }
 
-    // ---- Init ----
+    // ========================
+    // Inicialização
+    // ========================
     function init() {
         if (typeof jQuery === 'undefined' || !uw.Game || !uw.GPWindowMgr) {
             setTimeout(init, 500);

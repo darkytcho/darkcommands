@@ -1,29 +1,101 @@
 const fs = require('fs');
-const Terser = require('terser');
+const path = require('path');
+const crypto = require('crypto');
+const { execSync } = require('child_process');
 
-async function main() {
-    const src = fs.readFileSync('Dark Commands.user.js', 'utf8');
+const SRC = path.join(__dirname, 'src', 'Dark Commands.user.js');
+const CONFIG = path.join(__dirname, 'obfuscator.config.json');
+const OUT_OBFUSCATED = path.join(__dirname, 'dist', 'darkcommands.js');
+const OUT_LOADER = path.join(__dirname, 'dist', 'DarkCommands.obs.user.js');
+const TEMP_LOADER = path.join(__dirname, 'dist', '_loader_temp.js');
 
-    const metaMatch = src.match(/^(\/\/ ==UserScript==[\s\S]*?\/\/ ==\/UserScript==\n?)/);
-    const code = metaMatch ? src.slice(metaMatch[1].length) : src;
-    const meta = metaMatch ? metaMatch[1] : '';
+const GITHUB_RAW = 'https://raw.githubusercontent.com/darkytcho/darkcommands/main/dist/darkcommands.js';
 
-    const result = await Terser.minify(code, {
-        compress: {
-            passes: 2,
-            drop_debugger: true,
-            collapse_vars: true,
-            reduce_vars: true
-        },
-        mangle: true,
-        output: { comments: false }
-    });
+console.log('[build] Lendo source...');
+const source = fs.readFileSync(SRC, 'utf8');
 
-    if (result.error) throw result.error;
+console.log('[build] Obfuscando darkcommands.js...');
+const obfuscatorBin = path.join(__dirname, 'node_modules', '.bin', 'javascript-obfuscator');
+execSync(
+    `"${obfuscatorBin}" "${SRC}" --config "${CONFIG}" --output "${OUT_OBFUSCATED}"`,
+    { encoding: 'utf8', maxBuffer: 10 * 1024 * 1024 }
+);
 
-    fs.writeFileSync('Dark Commands.obf.user.js', meta + '\n' + result.code);
-    const kb = (fs.statSync('Dark Commands.obf.user.js').size / 1024).toFixed(1);
-    console.log(`✓ Obfuscated: ${kb} KB`);
-}
+console.log('[build] Calculando SHA-256...');
+const obfuscated = fs.readFileSync(OUT_OBFUSCATED);
+const hash = crypto.createHash('sha256').update(obfuscated).digest('hex');
+console.log('[build] Hash:', hash);
 
-main().catch(e => { console.error(e); process.exit(1); });
+console.log('[build] Gerando loader...');
+const version = JSON.parse(fs.readFileSync(path.join(__dirname, 'package.json'), 'utf8')).version;
+
+const loaderCode = `(function () {
+	'use strict';
+	var EXPECTED_HASH = '${hash}';
+	var u = '${GITHUB_RAW}?' + Date.now();
+
+	if (location.protocol !== 'https:') {
+		console.error('[Dark Commands] Abortado: conexao nao e HTTPS.');
+		return;
+	}
+
+	fetch(u)
+		.then(function (r) {
+			if (!r.ok) throw new Error('HTTP ' + r.status);
+			return r.text();
+		})
+		.then(function (c) {
+			return crypto.subtle.digest('SHA-256', new TextEncoder().encode(c))
+				.then(function (buf) {
+					var computed = Array.from(new Uint8Array(buf))
+						.map(function (b) { return b.toString(16).padStart(2, '0'); })
+						.join('');
+					return { code: c, hash: computed };
+				});
+		})
+		.then(function (result) {
+			if (result.hash !== EXPECTED_HASH) {
+				console.error('[Dark Commands] ERRO: Hash SHA-256 nao confere!');
+				console.error('[Dark Commands] Esperado:', EXPECTED_HASH);
+				console.error('[Dark Commands] Recebido:', result.hash);
+				console.error('[Dark Commands] O codigo pode ter sido adulterado. Atualizacao bloqueada.');
+				return;
+			}
+			var s = document.createElement('script');
+			s.textContent = result.code;
+			document.head.appendChild(s);
+			s.remove();
+		})
+		.catch(function (e) {
+			console.error('[Dark Commands] Falha ao carregar:', e.message);
+		});
+})();
+`;
+
+console.log('[build] Obfuscando loader...');
+fs.writeFileSync(TEMP_LOADER, loaderCode, 'utf8');
+execSync(
+    `"${obfuscatorBin}" "${TEMP_LOADER}" --config "${CONFIG}" --output "${TEMP_LOADER}"`,
+    { encoding: 'utf8', maxBuffer: 10 * 1024 * 1024 }
+);
+const obfuscatedLoader = fs.readFileSync(TEMP_LOADER, 'utf8');
+fs.unlinkSync(TEMP_LOADER);
+
+const metadata = `// ==UserScript==
+// @name         Dark Commands
+// @namespace    https://github.com/
+// @version      ${version}
+// @author       Dark Rebel
+// @description  GPT Time/Rank hide, Chegada de Comandos, Salvar Tropas, AutoLoad, Login Diario
+// @match        https://*.grepolis.com/game/*
+// @grant        GM_getValue
+// @grant        GM_setValue
+// @grant        unsafeWindow
+// @updateURL    https://github.com/darkytcho/darkcommands/releases/latest/download/DarkCommands.obs.user.js
+// @downloadURL  https://github.com/darkytcho/darkcommands/releases/latest/download/DarkCommands.obs.user.js
+// ==/UserScript==
+`;
+
+fs.writeFileSync(OUT_LOADER, metadata + obfuscatedLoader, 'utf8');
+console.log('[build] Loader obfuscado gerado:', OUT_LOADER);
+console.log('[build] Build concluido com sucesso!');
