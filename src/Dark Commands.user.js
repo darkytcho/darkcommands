@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Dark Commands
 // @namespace    https://github.com/
-// @version      1.4.5
+// @version      1.4.7
 // @author       Dark Rebel
 // @description  GPT Time/Rank hide, Chegada de Comandos, Salvar Tropas, AutoLoad, Login Diário
 // @match        https://*.grepolis.com/game/*
@@ -29,7 +29,7 @@
     const RESYNC_INTERVAL = 300;
     const VISUAL_WARN_SEC = 900;
     const SOUND_WARN_SEC = 120;
-    const VERSION = '1.4.6';
+    const VERSION = '1.4.7';
 
     // ========================
     // Audio (alertas sonoros)
@@ -70,7 +70,7 @@
             hideGPT: s.hideGPT !== undefined ? s.hideGPT : true,
             actBoxes: s.actBoxes !== undefined ? s.actBoxes : false,
             cmdArrival: s.cmdArrival !== undefined ? s.cmdArrival : true,
-            saveTroops: s.saveTroops !== undefined ? s.saveTroops : false,
+            saveTroops: s.saveTroops !== undefined ? s.saveTroops : true,
             autoLoad: s.autoLoad !== undefined ? s.autoLoad : true,
             loginDiario: s.loginDiario !== undefined ? s.loginDiario : true
         };
@@ -78,6 +78,18 @@
 
     function saveOpts() {
         try { GM_setValue('dark_ct_opts', JSON.stringify(OPTIONS)); } catch (e) { console.warn('[DarkCmds] saveOpts:', e.message); }
+    }
+
+    function _migrateOpts() {
+        try {
+            let prev = GM_getValue('dark_ct_version', '');
+            if (prev === VERSION) return;
+            if (OPTIONS.saveTroops === false && !_gptBotDetected()) {
+                OPTIONS.saveTroops = true;
+                saveOpts();
+            }
+            GM_setValue('dark_ct_version', VERSION);
+        } catch (e) { console.warn('[DarkCmds] migrate:', e.message); }
     }
 
     function _loadPanelPos() {
@@ -194,6 +206,7 @@ ${rows.map(function (r) {
         panel.on('click', '.dark_ct_close', function () { panel.hide(); });
         panel.on('click', '.dark_ct_toggle', function () {
             let key = $(this).closest('.dark_ct_row').data('key');
+            if (_sessionForced[key]) return;
             OPTIONS[key] = !OPTIONS[key];
             $(this).toggleClass('on');
             let $status = $(this).closest('.dark_ct_row').find('.dark_ct_status');
@@ -240,8 +253,12 @@ ${rows.map(function (r) {
         return !!document.querySelector('script[src*="DIO-TOOLS-David1327"]');
     }
 
+    let _sessionForced = {};
+
     function _updateConflictRow(dataKey, detectFn, disabledMsg, normalMsg) {
-        let disabled = detectFn();
+        let detected = detectFn();
+        let forced = _sessionForced[dataKey];
+        let disabled = detected || forced;
         let $row = $('.dark_ct_row[data-key="' + dataKey + '"]');
         if (!$row.length) return;
         let $toggle = $row.find('.dark_ct_toggle');
@@ -249,7 +266,7 @@ ${rows.map(function (r) {
         if (disabled) {
             $row.addClass('dark_ct_disabled');
             $toggle.removeClass('on').css({ opacity: 0.4, pointerEvents: 'none' });
-            $desc.text(disabledMsg);
+            $desc.text(forced && !detected ? disabledMsg + ' \u2014 recarregue para reativar' : disabledMsg);
         } else {
             $row.removeClass('dark_ct_disabled');
             $toggle.css({ opacity: '', pointerEvents: '' });
@@ -261,34 +278,17 @@ ${rows.map(function (r) {
     let _updateActBoxesRow = function () { _updateConflictRow('actBoxes', _hasDioTools, 'Desativado \u2014 DIO Tools detectado', 'Mantenha desativado se usar DIO Tools'); };
 
     function _trackConflict(detectFn, optionKey, updateRowFn) {
-        let wasForcedOff = false;
         return function () {
             setInterval(function () {
                 let detected = detectFn();
-                let $row = $('.dark_ct_row[data-key="' + optionKey + '"]');
-                if (!$row.length) return;
-                let $toggle = $row.find('.dark_ct_toggle');
-                let $desc = $row.find('.dark_ct_desc');
-                if (detected) {
+                if (detected && !_sessionForced[optionKey]) {
+                    _sessionForced[optionKey] = true;
                     if (OPTIONS[optionKey]) {
                         OPTIONS[optionKey] = false;
-                        saveOpts();
                         applyFeature(optionKey);
-                        wasForcedOff = true;
-                    }
-                    $row.addClass('dark_ct_disabled');
-                    $toggle.removeClass('on').css({ opacity: 0.4, pointerEvents: 'none' });
-                    $desc.text('Desativado \u2014 GPT-Bot detectado');
-                } else if (wasForcedOff) {
-                    wasForcedOff = false;
-                    $row.removeClass('dark_ct_disabled');
-                    $toggle.css({ opacity: '', pointerEvents: '' });
-                    $desc.text('Mantenha desativado se usar GPT-Bot-BR');
-                    if (OPTIONS[optionKey]) {
-                        applyFeature(optionKey);
-                        $toggle.addClass('on');
                     }
                 }
+                updateRowFn();
             }, 3000);
         };
     }
@@ -533,7 +533,7 @@ ${rows.map(function (r) {
     // Salvar Tropas
     // ========================
     let SaveTroops = {
-        _saved: {}, _timers: {}, _restoring: false, _active: false, _observers: {},
+        _saved: {}, _timers: {}, _restoring: false, _active: false, _observers: {}, _windowType: {},
         activate: function () {
             SaveTroops._active = true;
             SaveTroops._setupTabObserver();
@@ -543,7 +543,7 @@ ${rows.map(function (r) {
             $('.dark_dur_save_wrap').remove();
             for (let k in SaveTroops._timers) { clearInterval(SaveTroops._timers[k]); }
             for (let k in SaveTroops._observers) { SaveTroops._observers[k].disconnect(); }
-            SaveTroops._timers = {}; SaveTroops._observers = {}; SaveTroops._saved = {};
+            SaveTroops._timers = {}; SaveTroops._observers = {}; SaveTroops._saved = {}; SaveTroops._windowType = {};
         },
         _setupTabObserver: function () {
             document.querySelectorAll('.attack_support_window').forEach(function (el) {
@@ -615,10 +615,22 @@ ${rows.map(function (r) {
             let key = wndID.replace(/[^a-z0-9]/g, '_');
             console.log('[DarkCmds] _initSaveUI wndID:', JSON.stringify(wndID), 'key:', key);
             if (SaveTroops._timers[key]) { clearInterval(SaveTroops._timers[key]); delete SaveTroops._timers[key]; }
-            let tries = 0;
+            let tries = 0, stable = 0, lastType = null;
             SaveTroops._timers[key] = setInterval(function () {
                 if (!$(wndID).length || ++tries > 50) { clearInterval(SaveTroops._timers[key]); delete SaveTroops._timers[key]; return; }
+                let type = _getFormType(wndID);
+                if (type !== 'attack' && type !== 'support') { lastType = type; stable = 0; return; }
+                if (type === lastType) stable++; else stable = 1;
+                lastType = type;
+                let prevType = SaveTroops._windowType[wndID];
+                if (prevType && prevType !== type) {
+                    delete SaveTroops._saved[key + '_' + prevType];
+                    delete SaveTroops._saved[_savedKey(wndID)];
+                    console.log('[DarkCmds] aba trocou:', prevType, '->', type, 'saves limpos');
+                }
+                SaveTroops._windowType[wndID] = type;
                 if (!$(wndID + ' input.unit_input').length) return;
+                if (stable < 2) return;
                 clearInterval(SaveTroops._timers[key]); delete SaveTroops._timers[key];
                 if (SaveTroops._saved[_savedKey(wndID)] && _allInputsEmpty(wndID)) SaveTroops._restoreUnits(wndID);
                 $(wndID + ' input.unit_input').off('.dark_save').on('keyup.dark_save change.dark_save input.dark_save', function () {
@@ -915,6 +927,7 @@ ${rows.map(function (r) {
         addStyles();
         addBarButton();
         ajaxObserver();
+        _migrateOpts();
         _trackGptBot();
         _trackDioTools();
         applyAll();
