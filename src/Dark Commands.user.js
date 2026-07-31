@@ -29,7 +29,7 @@
     const RESYNC_INTERVAL = 300;
     const VISUAL_WARN_SEC = 900;
     const SOUND_WARN_SEC = 120;
-    const VERSION = '1.4.5';
+    const VERSION = '1.4.6';
 
     // ========================
     // Audio (alertas sonoros)
@@ -558,13 +558,14 @@ ${rows.map(function (r) {
                     if (debounce) return;
                     debounce = setTimeout(function () { debounce = null; }, 500);
                     let wndID = '#' + pid + ' ';
-                    delete SaveTroops._saved[_savedKey(wndID)];
-                    SaveTroops.add(wndID);
+                    let $nu = _getUnitsContainer(wndID);
+                    if ($nu.length && !$nu.find('.dark_dur_save_wrap').length) SaveTroops.add(wndID);
                 });
                 SaveTroops._observers[pid].observe(el, { childList: true, subtree: true });
             });
         },
         add: function (wndID) {
+            console.log('[DarkCmds] SaveTroops.add wndID:', JSON.stringify(wndID), 'active:', SaveTroops._active, 'opts:', OPTIONS.saveTroops);
             if (!SaveTroops._active || !OPTIONS.saveTroops) return;
             try {
                 SaveTroops._setupTabObserver();
@@ -612,13 +613,14 @@ ${rows.map(function (r) {
         },
         _initSaveUI: function (wndID, $btn) {
             let key = wndID.replace(/[^a-z0-9]/g, '_');
+            console.log('[DarkCmds] _initSaveUI wndID:', JSON.stringify(wndID), 'key:', key);
             if (SaveTroops._timers[key]) { clearInterval(SaveTroops._timers[key]); delete SaveTroops._timers[key]; }
             let tries = 0;
             SaveTroops._timers[key] = setInterval(function () {
                 if (!$(wndID).length || ++tries > 50) { clearInterval(SaveTroops._timers[key]); delete SaveTroops._timers[key]; return; }
                 if (!$(wndID + ' input.unit_input').length) return;
                 clearInterval(SaveTroops._timers[key]); delete SaveTroops._timers[key];
-                if (SaveTroops._saved[_savedKey(wndID)]) SaveTroops._restoreUnits(wndID);
+                if (SaveTroops._saved[_savedKey(wndID)] && _allInputsEmpty(wndID)) SaveTroops._restoreUnits(wndID);
                 $(wndID + ' input.unit_input').off('.dark_save').on('keyup.dark_save change.dark_save input.dark_save', function () {
                     if ($btn.hasClass('active')) SaveTroops._saveUnits(wndID);
                     if (!SaveTroops._saved[_savedKey(wndID)] || !Object.keys(SaveTroops._saved[_savedKey(wndID)]).length) return;
@@ -634,12 +636,15 @@ ${rows.map(function (r) {
         },
         _saveUnits: function (wndID) {
             let btn = document.querySelector(wndID + ' .dark_dur_save_btn');
+            console.log('[DarkCmds] _saveUnits wndID:', JSON.stringify(wndID), 'btn:', !!btn, 'active:', btn ? btn.classList.contains('active') : false);
             if (btn && btn.classList.contains('active')) {
                 let units = {};
                 $(wndID + ' input.unit_input').each(function () {
                     let val = $(this).val();
+                    console.log('[DarkCmds] _saveUnits input:', this.name, '=', val);
                     if (val && parseInt(val, RADIX) > 0) units[this.name] = val;
                 });
+                console.log('[DarkCmds] _saveUnits result:', JSON.stringify(units));
                 if (Object.keys(units).length) SaveTroops._saved[_savedKey(wndID)] = units;
             }
         },
@@ -661,10 +666,13 @@ ${rows.map(function (r) {
             SaveTroops._restoring = true;
             try {
                 let saved = SaveTroops._saved[_savedKey(wndID)];
+                console.log('[DarkCmds] _restoreUnits wndID:', JSON.stringify(wndID), 'key:', _savedKey(wndID), 'saved:', JSON.stringify(saved));
                 if (!saved) return;
                 for (let unit in saved) {
                     let val = saved[unit];
-                    if (val) { let $input = $(wndID + ' input[name="' + unit + '"]'); if ($input.length) $input.val(val).trigger('keyup'); }
+                    let $input = $(wndID + ' input[name="' + unit + '"]');
+                    console.log('[DarkCmds] _restoreUnits unit:', unit, 'val:', val, 'input found:', $input.length);
+                    if (val && $input.length) $input.val(val).trigger('keyup');
                 }
             } catch (e) { console.warn('[DarkCmds] _restoreUnits:', e.message); } finally { SaveTroops._restoring = false; }
         }
@@ -712,15 +720,17 @@ ${rows.map(function (r) {
 
                 $(wndID + ' input.unit_input').each(function () {
                     let uid = this.name;
-                    if (uid === 'big_transporter' || uid === 'small_transporter' || uid === 'colony_ship' || uid === 'none') return;
-                    if ($(this).closest('.naval_units').length) return;
+                    if (uid === 'big_transporter' || uid === 'small_transporter' || uid === 'none') return;
                     let cnt = uCount(uid);
                     if (cnt <= 0) return;
                     let ud = gd[uid];
-                    if (ud && ud.flying) {
+                    if (!ud) return;
+                    if (ud.is_naval) {
+                        fillInput(uid, uid === 'colony_ship' ? 1 : cnt);
+                    } else if (ud.flying) {
                         fillInput(uid, cnt);
                     } else {
-                        let pop = ud ? (ud.population || ud.pop || 1) : 1;
+                        let pop = ud.population || ud.pop || 1;
                         landUnits.push({ id: uid, pop: pop, count: cnt });
                         totalPop += cnt * pop;
                     }
@@ -749,13 +759,6 @@ ${rows.map(function (r) {
                         if (btAvail > 0) fillInput('big_transporter', btAvail);
                     }
                 }
-
-                $(wndID + ' .naval_units input.unit_input').each(function () {
-                    let uid = this.name;
-                    if (uid === 'big_transporter' || uid === 'small_transporter' || uid === 'none') return;
-                    let maxCount = (uid === 'colony_ship') ? 1 : uCount(uid);
-                    if (maxCount > 0) $(this).val(maxCount);
-                });
 
                 $(wndID + ' input.unit_input').each(function () {
                     $(this).trigger('keyup').trigger('change');
