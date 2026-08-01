@@ -10,7 +10,7 @@ const OUT_LOADER = path.join(__dirname, 'dist', 'DarkCommands.obs.user.js');
 const TEMP_LOADER = path.join(__dirname, 'dist', '_loader_temp.js');
 
 const version = JSON.parse(fs.readFileSync(path.join(__dirname, 'package.json'), 'utf8')).version;
-const GITHUB_RAW = 'https://github.com/darkytcho/darkcommands/releases/download/v' + version + '/darkcommands.js';
+const GITHUB_RAW = 'https://raw.githubusercontent.com/darkytcho/darkcommands/v' + version + '/dist/darkcommands.js';
 
 console.log('[build] Lendo source...');
 const source = fs.readFileSync(SRC, 'utf8');
