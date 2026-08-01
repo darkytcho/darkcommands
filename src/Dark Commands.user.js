@@ -29,7 +29,7 @@
     const RESYNC_INTERVAL = 300;
     const VISUAL_WARN_SEC = 900;
     const SOUND_WARN_SEC = 120;
-    const VERSION = '1.4.8';
+    const VERSION = '1.4.9';
 
     // ========================
     // Audio (alertas sonoros)
@@ -82,7 +82,7 @@
             actBoxes: s.actBoxes !== undefined ? s.actBoxes : false,
             cmdArrival: s.cmdArrival !== undefined ? s.cmdArrival : true,
             saveTroops: s.saveTroops !== undefined ? s.saveTroops : true,
-            autoLoad: s.autoLoad !== undefined ? s.autoLoad : true,
+            autoLoad: s.autoLoad !== undefined ? s.autoLoad : false,
             loginDiario: s.loginDiario !== undefined ? s.loginDiario : true
         };
     })();
@@ -103,14 +103,6 @@
         } catch (e) { console.warn('[DarkCmds] migrate:', e.message); }
     }
 
-    function _loadPanelPos() {
-        try { return JSON.parse(_storageGet('dark_ct_panel_pos', 'null')); } catch (e) { return null; }
-    }
-
-    function _savePanelPos(left, top) {
-        try { _storageSet('dark_ct_panel_pos', JSON.stringify({ left: Math.round(left), top: Math.round(top) })); } catch (e) {}
-    }
-
     // ========================
     // CSS
     // ========================
@@ -119,21 +111,39 @@
             '@keyframes dark_hap_pulse { 0% { color:#ff2222; opacity:1; text-shadow:0 0 6px #ffffff; transform:translateX(-50%) scale(1); } 25% { color:#ff0000; opacity:1; text-shadow:0 0 12px #ffffff,0 0 20px #ffffff; transform:translateX(-50%) scale(1.3); } 50% { color:#ff4444; opacity:1; text-shadow:0 0 6px #ffffff; transform:translateX(-50%) scale(1); } 75% { color:#ff0000; opacity:1; text-shadow:0 0 12px #ffffff,0 0 20px #ffffff; transform:translateX(-50%) scale(1.3); } 100% { color:#ff2222; opacity:1; text-shadow:0 0 6px #ffffff; transform:translateX(-50%) scale(1); } } ' +
             '        .dark_hap_warning { animation:dark_hap_pulse 2s infinite; font-size:13px !important; } ' +
 
-            '.dark_ct_settings { position:fixed; z-index:10000; width:320px; min-height:200px; background:linear-gradient(135deg,#1a1612 0%,#2d2519 100%); border:1px solid #5a4a32; border-radius:8px; box-shadow:0 4px 20px rgba(0,0,0,0.6); padding:0; color:#C4B998; font-family:Arial,sans-serif; font-size:12px; } ' +
-            '.dark_ct_settings .dark_ct_header { position:relative; padding:8px 12px; background:linear-gradient(180deg,#3d3224 0%,#2d2519 100%); border-bottom:1px solid #5a4a32; border-radius:8px 8px 0 0; font-size:14px; font-weight:bold; color:#FFD700; cursor:move; } ' +
-            '.dark_ct_settings .dark_ct_close { position:absolute; top:50%; right:8px; transform:translateY(-50%); width:26px; height:26px; color:#8a7a62; font-size:18px; font-weight:bold; cursor:pointer; text-align:center; line-height:26px; border-radius:4px; } ' +
-            '.dark_ct_settings .dark_ct_close:hover { color:#FFD700; background:rgba(255,255,255,0.1); } ' +
-            '.dark_ct_settings .dark_ct_body { padding:8px 12px 12px; } ' +
-            '.dark_ct_row { display:flex; align-items:center; justify-content:space-between; padding:6px 0; border-bottom:1px solid rgba(90,74,50,0.4); } ' +
-            '.dark_ct_row:last-child { border-bottom:none; } ' +
-            '.dark_ct_label { flex:1; font-size:12px; text-align:left; } ' +
-            '.dark_ct_desc { font-size:10px; color:#8a7a62; margin-top:1px; text-align:left; } ' +
-            '.dark_ct_row.dark_ct_disabled { opacity:0.55; } ' +
-            '.dark_ct_row.dark_ct_disabled .dark_ct_label { text-decoration:line-through; } ' +
-            '.dark_ct_toggle { position:relative; width:44px; height:22px; flex-shrink:0; margin-left:8px; cursor:pointer; background:#3d3224; border-radius:11px; border:1px solid #5a4a32; transition:background 0.2s; } ' +
-            '.dark_ct_toggle.on { background:#4a7a3a; border-color:#5a9a4a; } ' +
-            '.dark_ct_toggle .dark_ct_knob { position:absolute; top:1px; left:1px; width:18px; height:18px; background:#C4B998; border-radius:50%; transition:left 0.2s; } ' +
-            '.dark_ct_toggle.on .dark_ct_knob { left:23px; } ' +
+            '.dark_ct_modal { position:fixed; top:0; left:0; width:100%; height:100%; z-index:99999; display:flex; align-items:center; justify-content:center; } ' +
+            '.dark_ct_overlay { position:absolute; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); } ' +
+            '.dark_ct_box { position:relative; width:560px; max-width:94vw; max-height:88vh; background:#2a1a0e; border:2px solid #8b6914; border-radius:8px; padding:20px; box-sizing:border-box; overflow-y:auto; color:#fc6; font-family:Arial,sans-serif; font-size:13px; box-shadow:0 8px 24px rgba(0,0,0,0.6); } ' +
+            '.dark_ct_head { position:relative; display:flex; align-items:center; justify-content:space-between; gap:12px; margin:-20px -20px 14px; padding:10px 14px; background:linear-gradient(180deg,#3a2a10,#241707); border-bottom:2px solid #8b6914; border-radius:6px 6px 0 0; } ' +
+            '.dark_ct_title { flex:1; display:flex; align-items:center; gap:8px; font-size:14px; font-weight:bold; color:#fc6; text-shadow:0 1px 2px rgba(0,0,0,0.6); user-select:none; } ' +
+            '.dark_ct_version { font-size:10px; color:#b8942f; font-weight:normal; } ' +
+            '.dark_ct_headcenter { position:absolute; left:0; right:0; text-align:center; pointer-events:none; font-size:13px; font-weight:bold; color:#b8942f; letter-spacing:1px; text-transform:uppercase; white-space:nowrap; user-select:none; } ' +
+            '.dark_ct_headright { flex:1; display:flex; justify-content:flex-end; } ' +
+            '.dark_ct_tabs { display:flex; background:#1a1a1a; border:1px solid #8b6914; border-radius:6px; padding:2px; } ' +
+            '.dark_ct_tab { padding:5px 16px; border-radius:4px; font-size:11px; font-weight:bold; cursor:pointer; transition:background 0.15s,color 0.15s; } ' +
+            '.dark_ct_tab.on { background:#d4a017; color:#2a1a0e; } ' +
+            '.dark_ct_tab.off { background:transparent; color:#997; } ' +
+            '.dark_ct_section { font-size:13px; font-weight:bold; color:#d4a017; margin:12px 0 4px; padding-bottom:4px; border-bottom:1px solid rgba(139,105,20,0.4); } ' +
+            '.dark_ct_section:first-child { margin-top:0; } ' +
+            '.dark_ct_row { display:flex; align-items:flex-start; justify-content:space-between; margin:8px 0; padding:6px; border-radius:4px; cursor:pointer; } ' +
+            '.dark_ct_row:hover { background:rgba(255,255,255,0.08); } ' +
+            '.dark_ct_info { flex:1; margin-right:10px; text-align:left; } ' +
+            '.dark_ct_label { font-size:12px; font-weight:bold; color:#fc6; margin-bottom:2px; display:flex; align-items:center; gap:6px; } ' +
+            '.dark_ct_desc { font-size:10px; color:#aaa; line-height:1.3; } ' +
+            '.dark_ct_badge { font-size:9px; font-weight:normal; color:#2ecc71; border:1px solid #2ecc71; border-radius:3px; padding:0 4px; line-height:1.4; } ' +
+            '.dark_ct_badge_beta { color:#f39c12; border-color:#f39c12; } ' +
+            '.dark_ct_cb { width:16px; height:16px; border:2px solid #8b6914; border-radius:3px; display:flex; align-items:center; justify-content:center; flex-shrink:0; margin-top:2px; transition:background 0.15s,border-color 0.15s; } ' +
+            '.dark_ct_cb.off { background:#1a1a1a; } ' +
+            '.dark_ct_cb.on { background:#4CAF50; border-color:#4CAF50; } ' +
+            '.dark_ct_check { color:white; font-size:11px; font-weight:bold; line-height:1; } ' +
+            '.dark_ct_row.dark_ct_disabled { opacity:0.5; } ' +
+            '.dark_ct_row.dark_ct_disabled .dark_ct_cb { border-color:#555; background:#2a2a2a; } ' +
+            '.dark_ct_btnbar { display:flex; gap:10px; justify-content:center; margin-top:14px; } ' +
+            '.dark_ct_btn { cursor:pointer; padding:6px 16px; border-radius:4px; font-size:12px; font-weight:bold; color:#fff; } ' +
+            '.dark_ct_btn.dark_ct_closebtn { background:#8b6914; } ' +
+            '.dark_ct_btn.dark_ct_closebtn:hover { background:#a67c1a; } ' +
+            '.dark_ct_btn.dark_ct_danger { background:#c0392b; } ' +
+            '.dark_ct_btn.dark_ct_danger:hover { background:#e74c3c; } ' +
             '.dark_ct_btn_bar { position:fixed; bottom:10px; left:10px; z-index:9999; } ' +
             '.dark_ct_btn_bar button { display:block; width:36px; height:36px; margin-bottom:4px; background:linear-gradient(180deg,#3d3224,#2d2519); border:1px solid #5a4a32; border-radius:6px; color:#FFD700; font-size:16px; cursor:pointer; line-height:1; padding:0; } ' +
             '.dark_ct_btn_bar button:hover { background:#5a4a30; } ' +
@@ -162,90 +172,98 @@
         let bar = $('<div id="dark_ct_btn_bar" class="dark_ct_btn_bar"><button id="dark_ct_gear" title="Configurar Dark Commands">\u2699</button></div>');
         bar.appendTo('body');
         bar.on('click', '#dark_ct_gear', function () {
-            let $panel = $('#dark_ct_panel');
-            if ($panel.length) {
-                $panel.toggle();
-                if ($panel.is(':visible')) _syncPanelState();
-                return;
-            }
+            if ($('#dark_ct_modal').length) { $('#dark_ct_modal').remove(); return; }
             openSettings();
         });
     }
 
-    function openSettings() {
-        let $panel = $('#dark_ct_panel');
-        if ($panel.length) {
-            $panel.show();
-            _syncPanelState();
-            return;
-        }
-
-        let savedPos = _loadPanelPos();
-        let left, top;
-        if (savedPos) {
-            left = savedPos.left;
-            top = savedPos.top;
-        } else {
-            left = Math.max(0, Math.round((window.innerWidth - 320) / 2));
-            top = Math.max(0, Math.round((window.innerHeight - 400) / 2));
-        }
-
-        let panel = $('<div id="dark_ct_panel" class="dark_ct_settings">').css({ left: left + 'px', top: top + 'px' });
-
-        let rows = [
-            { key: 'hideGPT', label: 'Ocultar GPT Time/Rank', desc: 'Remove gpt-time e gpt-rank da lista de comandos' },
-            { key: 'actBoxes', label: 'Caixas de com\u00e9rcio e ataque', desc: 'Mantenha desativado se usar DIO Tools' },
-            { key: 'cmdArrival', label: 'Chegada de Comandos', desc: 'Mostra hor\u00e1rio de chegada na lista de comandos' },
-            { key: 'saveTroops', label: 'Salvar Tropas', desc: 'Mantenha desativado se usar GPT-Bot-BR' },
-            { key: 'autoLoad', label: 'AutoLoad', desc: 'Bot\u00e3o Auto para preencher tropas dispon\u00edveis' },
-            { key: 'loginDiario', label: 'Login Di\u00e1rio', desc: 'Contagem regressiva para reset do servidor no \u00edcone' }
-        ];
-
-        let html = `<div class="dark_ct_header"><span>Dark Commands v${VERSION}</span><span class="dark_ct_close">\u2716</span></div><div class="dark_ct_body">
-${rows.map(function (r) {
-    var on = OPTIONS[r.key] ? ' on' : '';
-    var st = OPTIONS[r.key] ? 'Ativado' : 'Desativado';
-    var sc = OPTIONS[r.key] ? '#4a7a3a' : '#8a7a62';
-    return '<div class="dark_ct_row" data-key="' + r.key + '"><div><div class="dark_ct_label">' + r.label + '</div><div class="dark_ct_desc">' + r.desc + '</div></div><div style="display:flex;align-items:center;gap:6px;"><span class="dark_ct_status" style="font-size:10px;font-weight:bold;color:' + sc + '">' + st + '</span><div class="dark_ct_toggle' + on + '"><div class="dark_ct_knob"></div></div></div></div>';
-}).join('')}
-</div>`;
-
-        panel.html(html).appendTo('body');
-        _updateSaveTroopsRow();
-        _updateActBoxesRow();
-
-        panel.on('click', '.dark_ct_close', function () { panel.hide(); });
-        panel.on('click', '.dark_ct_toggle', function () {
-            let key = $(this).closest('.dark_ct_row').data('key');
+    function _buildRow(key, label, desc, badge, badgeCls) {
+        let on = OPTIONS[key];
+        let $row = $('<div class="dark_ct_row" data-key="' + key + '"></div>');
+        let $label = $('<div class="dark_ct_label">' + label + '</div>');
+        if (badge) $label.append('<span class="dark_ct_badge' + (badgeCls ? ' ' + badgeCls : '') + '">' + badge + '</span>');
+        let $info = $('<div class="dark_ct_info"></div>').append($label, '<div class="dark_ct_desc">' + desc + '</div>');
+        let $cb = $('<div class="dark_ct_cb ' + (on ? 'on' : 'off') + '"><div class="dark_ct_check" style="display:' + (on ? '' : 'none') + '">\u2713</div></div>');
+        $row.append($info, $cb);
+        $row.on('click', function () {
             if (_sessionForced[key]) return;
             OPTIONS[key] = !OPTIONS[key];
-            $(this).toggleClass('on');
-            let $status = $(this).closest('.dark_ct_row').find('.dark_ct_status');
-            $status.text(OPTIONS[key] ? 'Ativado' : 'Desativado').css('color', OPTIONS[key] ? '#4a7a3a' : '#8a7a62');
+            _setRowState($row, OPTIONS[key]);
             saveOpts();
             applyFeature(key);
         });
+        return $row;
+    }
 
-        $(document).on('keydown.dark_ct_panel', function (e) {
-            if (e.key === 'Escape' && $('#dark_ct_panel').is(':visible')) {
-                $('#dark_ct_panel').hide();
-            }
+    function _setRowState($row, on) {
+        let $cb = $row.find('.dark_ct_cb');
+        $cb.toggleClass('on', !!on).toggleClass('off', !on);
+        $cb.find('.dark_ct_check').css('display', on ? '' : 'none');
+    }
+
+    function openSettings() {
+        if ($('#dark_ct_modal').length) return;
+
+        const modal = $('<div id="dark_ct_modal" class="dark_ct_modal"></div>');
+        const overlay = $('<div class="dark_ct_overlay"></div>');
+        const box = $('<div class="dark_ct_box"></div>');
+
+        const head = $('<div class="dark_ct_head"></div>');
+        const title = $('<div class="dark_ct_title">Dark Commands <span class="dark_ct_version">v' + VERSION + '</span></div>');
+        const center = $('<div class="dark_ct_headcenter">Configura\u00e7\u00f5es</div>');
+        head.append(title, center);
+
+        const painel = $('<div class="dark_ct_pane"></div>');
+        painel.append('<div class="dark_ct_section">Comandos</div>');
+        painel.append(_buildRow('hideGPT', 'Ocultar GPT Time/Rank', 'Remove os hor\u00e1rios e ranks do GPT da lista de comandos.'));
+        painel.append(_buildRow('cmdArrival', 'Chegada de Comandos', 'Exibe o hor\u00e1rio de chegada ao lado de cada comando na lista.'));
+        painel.append(_buildRow('actBoxes', 'Caixas de com\u00e9rcio e ataque', 'Reativa as caixas de com\u00e9rcio e ataque da lista de comandos. Desative se usar DIO Tools.'));
+        painel.append(_buildRow('saveTroops', 'Salvar Tropas', 'Salva a composi\u00e7\u00e3o de tropas (ataque ou apoio) e permite restaur\u00e1-la depois. Desative se usar GPT-Bot-BR.'));
+        painel.append(_buildRow('autoLoad', 'AutoLoad', 'Adiciona o bot\u00e3o Auto na janela de comandos, que preenche as tropas dispon\u00edveis (terrestres, navais e m\u00edticas) e calcula os transportadores. Em janelas de ataque ignora unidades de defesa; em janelas de apoio ignora unidades de ataque.', 'Beta', 'dark_ct_badge_beta'));
+        painel.append(_buildRow('loginDiario', 'Login Di\u00e1rio', 'Mostra no \u00edcone de login a contagem regressiva para o reset di\u00e1rio do servidor, com alerta sonoro e visual nos \u00faltimos minutos.'));
+
+        const btnRestaurar = $('<div class="dark_ct_btn dark_ct_danger">Restaurar Padr\u00f5es</div>');
+        const btnFechar = $('<div class="dark_ct_btn dark_ct_closebtn">Fechar</div>');
+        const botoes = $('<div class="dark_ct_btnbar"></div>').append(btnRestaurar, btnFechar);
+
+        box.append(head, painel, botoes);
+        modal.append(overlay, box).appendTo('body');
+
+        _syncPanelState();
+
+        function fechar() { modal.remove(); }
+        overlay.on('click', fechar);
+        btnFechar.on('click', fechar);
+
+        btnRestaurar.on('click', function () {
+            const confirmModal = $('<div class="dark_ct_modal" style="z-index:100000;"></div>');
+            const confirmOverlay = $('<div class="dark_ct_overlay" style="background:rgba(0,0,0,0.7);"></div>');
+            const confirmBox = $('<div style="position:relative;background:#2a1a0e;border:2px solid #c0392b;border-radius:8px;padding:20px;max-width:340px;color:#fc6;font-family:Arial,sans-serif;font-size:13px;text-align:center;"></div>');
+            const confirmTitulo = $('<div style="font-size:14px;font-weight:bold;margin-bottom:10px;color:#e74c3c;">Restaurar Padr\u00f5es?</div>');
+            const confirmTxt = $('<div style="font-size:12px;color:#aaa;line-height:1.5;margin-bottom:16px;">Isso vai restabelecer todas as op\u00e7\u00f5es do Dark Commands.<br><br>Suas configura\u00e7\u00f5es atuais ser\u00e3o perdidas.</div>');
+            const confirmBtns = $('<div style="display:flex;gap:10px;justify-content:center;"></div>');
+            const btnSim = $('<div class="dark_ct_btn dark_ct_danger">Sim, restaurar</div>');
+            const btnNao = $('<div class="dark_ct_btn dark_ct_closebtn">Cancelar</div>');
+            confirmBtns.append(btnSim, btnNao);
+            confirmBox.append(confirmTitulo, confirmTxt, confirmBtns);
+            confirmModal.append(confirmOverlay, confirmBox).appendTo('body');
+            function fecharConfirm() { confirmModal.remove(); }
+            confirmOverlay.on('click', fecharConfirm);
+            btnNao.on('click', fecharConfirm);
+            btnSim.on('click', function () {
+                const defaults = { hideGPT: true, actBoxes: false, cmdArrival: true, saveTroops: true, autoLoad: false, loginDiario: true };
+                for (let k in defaults) {
+                    if (OPTIONS[k] !== defaults[k]) { OPTIONS[k] = defaults[k]; applyFeature(k); }
+                }
+                saveOpts();
+                _syncPanelState();
+                confirmModal.remove();
+                try { uw.HumanMessage.success('Configura\u00e7\u00f5es restauradas'); } catch (e) {}
+            });
         });
 
-        let dragData = null;
-        panel.on('mousedown', '.dark_ct_header', function (e) {
-            dragData = { startX: e.clientX, startY: e.clientY, origLeft: left, origTop: top };
-            e.preventDefault();
-        });
-        $(document).on('mousemove.dark_ct_drag', function (e) {
-            if (!dragData) return;
-            left = Math.max(0, dragData.origLeft + (e.clientX - dragData.startX));
-            top = Math.max(0, dragData.origTop + (e.clientY - dragData.startY));
-            panel.css({ left: left + 'px', top: top + 'px' });
-        });
-        $(document).on('mouseup.dark_ct_drag', function () {
-            if (dragData) _savePanelPos(left, top);
-            dragData = null;
+        $(document).off('keydown.dark_ct_panel').on('keydown.dark_ct_panel', function (e) {
+            if (e.key === 'Escape') $('#dark_ct_modal').remove();
         });
     }
 
@@ -272,21 +290,24 @@ ${rows.map(function (r) {
         let disabled = detected || forced;
         let $row = $('.dark_ct_row[data-key="' + dataKey + '"]');
         if (!$row.length) return;
-        let $toggle = $row.find('.dark_ct_toggle');
+        let $cb = $row.find('.dark_ct_cb');
         let $desc = $row.find('.dark_ct_desc');
         if (disabled) {
             $row.addClass('dark_ct_disabled');
-            $toggle.removeClass('on').css({ opacity: 0.4, pointerEvents: 'none' });
+            $cb.removeClass('on').addClass('off');
+            $cb.find('.dark_ct_check').css('display', 'none');
+            $cb.css({ opacity: 0.4, pointerEvents: 'none' });
             $desc.text(forced && !detected ? disabledMsg + ' \u2014 recarregue para reativar' : disabledMsg);
         } else {
             $row.removeClass('dark_ct_disabled');
-            $toggle.css({ opacity: '', pointerEvents: '' });
+            $cb.css({ opacity: '', pointerEvents: '' });
+            _setRowState($row, !!OPTIONS[dataKey]);
             $desc.text(normalMsg);
         }
     }
 
-    let _updateSaveTroopsRow = function () { _updateConflictRow('saveTroops', _gptBotDetected, 'Desativado \u2014 GPT-Bot detectado', 'Mantenha desativado se usar GPT-Bot-BR'); };
-    let _updateActBoxesRow = function () { _updateConflictRow('actBoxes', _hasDioTools, 'Desativado \u2014 DIO Tools detectado', 'Mantenha desativado se usar DIO Tools'); };
+    let _updateSaveTroopsRow = function () { _updateConflictRow('saveTroops', _gptBotDetected, 'Desativado \u2014 GPT-Bot detectado', 'Salva a composi\u00e7\u00e3o de tropas (ataque ou apoio) e permite restaur\u00e1-la depois. Desative se usar GPT-Bot-BR.'); };
+    let _updateActBoxesRow = function () { _updateConflictRow('actBoxes', _hasDioTools, 'Desativado \u2014 DIO Tools detectado', 'Reativa as caixas de com\u00e9rcio e ataque da lista de comandos. Desative se usar DIO Tools.'); };
 
     function _trackConflict(detectFn, optionKey, updateRowFn) {
         return function () {
@@ -311,9 +332,7 @@ ${rows.map(function (r) {
         $('.dark_ct_row').each(function () {
             let key = $(this).data('key');
             if (key === undefined) return;
-            let on = OPTIONS[key];
-            $(this).find('.dark_ct_toggle').toggleClass('on', !!on);
-            $(this).find('.dark_ct_status').text(on ? 'Ativado' : 'Desativado').css('color', on ? '#4a7a3a' : '#8a7a62');
+            _setRowState($(this), !!OPTIONS[key]);
         });
         _updateSaveTroopsRow();
         _updateActBoxesRow();
@@ -445,7 +464,7 @@ ${rows.map(function (r) {
     // Chegada de Comandos
     // ========================
     let CommandArrival = {
-        _observer: null, _observerTarget: null, _active: false, _reconnectTimer: null,
+        _observer: null, _observerTarget: null, _active: false, _reconnectTimer: null, _raf: null,
         activate: function () {
             if (CommandArrival._active) return;
             CommandArrival._active = true;
@@ -470,6 +489,8 @@ ${rows.map(function (r) {
             $(document).off('ajaxComplete.dark_ct_arrival');
             if (CommandArrival._observer) { CommandArrival._observer.disconnect(); CommandArrival._observer = null; }
             CommandArrival._observerTarget = null;
+            if (CommandArrival._raf && window.cancelAnimationFrame) cancelAnimationFrame(CommandArrival._raf);
+            CommandArrival._raf = null;
             if (CommandArrival._reconnectTimer) { clearInterval(CommandArrival._reconnectTimer); CommandArrival._reconnectTimer = null; }
             $('.dark_arrival').remove();
         },
@@ -487,37 +508,44 @@ ${rows.map(function (r) {
                 }
             }
         },
+        _scheduleProcess: function () {
+            if (CommandArrival._raf) return;
+            CommandArrival._raf = requestAnimationFrame(function () {
+                CommandArrival._raf = null;
+                CommandArrival._process();
+            });
+        },
         _process: function () {
+            if (!CommandArrival._active) return;
             let list = document.querySelectorAll('#toolbar_activity_commands_list > div > div.content > div');
             for (let i = 0; i < list.length; i++) {
                 if (list[i].getAttribute('data-timestamp')) CommandArrival._insert(list[i]);
             }
         },
         _startObserver: function () {
-            let target = document.querySelector('#toolbar_activity_commands_list > div > div.content');
-            if (!target) { setTimeout(CommandArrival._startObserver, 1000); return; }
+            let target = document.querySelector('#toolbar_activity_commands_list');
+            if (!target) { setTimeout(CommandArrival._startObserver, 500); return; }
             if (CommandArrival._observer) CommandArrival._observer.disconnect();
             CommandArrival._observerTarget = target;
-            CommandArrival._observer = new MutationObserver(function () { CommandArrival._process(); });
-            CommandArrival._observer.observe(target, { childList: true, subtree: true, attributes: true, attributeFilter: ['data-timestamp'] });
+            CommandArrival._observer = new MutationObserver(function () { CommandArrival._scheduleProcess(); });
+            CommandArrival._observer.observe(target, { childList: true, subtree: true, attributes: true, attributeFilter: ['data-timestamp'], characterData: true });
         },
         _startReconnect: function () {
             if (CommandArrival._reconnectTimer) clearInterval(CommandArrival._reconnectTimer);
             CommandArrival._reconnectTimer = setInterval(function () {
                 if (!CommandArrival._active) { clearInterval(CommandArrival._reconnectTimer); CommandArrival._reconnectTimer = null; return; }
-                let target = document.querySelector('#toolbar_activity_commands_list > div > div.content');
-                if (!target) return;
-                if (CommandArrival._observerTarget !== target) {
+                let target = document.querySelector('#toolbar_activity_commands_list');
+                if (!target || !CommandArrival._observerTarget || CommandArrival._observerTarget !== target || !document.contains(CommandArrival._observerTarget)) {
                     CommandArrival._startObserver();
-                    CommandArrival._process();
                 }
-            }, 1500);
+                CommandArrival._scheduleProcess();
+            }, 1000);
         },
         _insert: function (item) {
             try {
                 let ts = item.getAttribute('data-timestamp');
                 if (!ts) return;
-                let wrapper = item.querySelector('div > .details_wrapper');
+                let wrapper = item.querySelector('.details_wrapper');
                 if (!wrapper) return;
                 let timeStr = CommandArrival._toTime(ts);
                 let existing = wrapper.querySelector('.dark_arrival');
@@ -525,13 +553,17 @@ ${rows.map(function (r) {
                     if (existing.textContent !== timeStr) existing.textContent = timeStr;
                     return;
                 }
-                let timeDiv = wrapper.querySelector('.time');
                 let node = document.createElement('span');
                 node.className = 'dark_arrival';
                 node.textContent = timeStr;
-                if (timeDiv) timeDiv.appendChild(node);
-                else wrapper.appendChild(node);
-            } catch (e) { console.warn('[DarkCmds] _appendTimestamp:', e.message); }
+                let timeDiv = wrapper.querySelector('.time');
+                if (timeDiv) {
+                    if (timeDiv.nextSibling) timeDiv.parentNode.insertBefore(node, timeDiv.nextSibling);
+                    else timeDiv.parentNode.appendChild(node);
+                } else {
+                    wrapper.appendChild(node);
+                }
+            } catch (e) { console.warn('[DarkCmds] _insert:', e.message); }
         },
         _toTime: function (ts) {
             let d = new Date(parseInt(ts, RADIX) * MS_PER_SEC);
@@ -701,6 +733,13 @@ ${rows.map(function (r) {
         }
     };
 
+    function _unitClass(ud) {
+        if (!ud) return 'balanced';
+        if (ud.unit_function === 'function_off') return 'attack';
+        if (ud.unit_function === 'function_def') return 'defense';
+        return 'balanced';
+    }
+
     // ========================
     // AutoLoad
     // ========================
@@ -736,6 +775,8 @@ ${rows.map(function (r) {
                 let rawUnits = iTown.units();
                 function uCount(uid) { let c = rawUnits[uid]; if (c != null) return parseInt(c, RADIX) || 0; if (rawUnits.get) return parseInt(rawUnits.get(uid), RADIX) || 0; return 0; }
                 let gd = uw.GameData.units; if (!gd) return;
+                let formType = _getFormType(wndID);
+                let skipped = 0;
 
                 let landUnits = [], totalPop = 0;
 
@@ -747,8 +788,11 @@ ${rows.map(function (r) {
                     let cnt = uCount(uid);
                     if (cnt <= 0) return;
                     let ud = gd[uid];
-                    if (!ud) return;
-                    if (ud.is_naval) {
+            if (!ud) return;
+            let cls = _unitClass(ud);
+            if (formType === 'attack' && cls === 'defense') { skipped++; return; }
+            if (formType === 'support' && cls === 'attack') { skipped++; return; }
+            if (ud.is_naval) {
                         fillInput(uid, uid === 'colony_ship' ? 1 : cnt);
                     } else if (ud.flying) {
                         fillInput(uid, cnt);
@@ -782,6 +826,8 @@ ${rows.map(function (r) {
                         if (btAvail > 0) fillInput('big_transporter', btAvail);
                     }
                 }
+
+                if (skipped > 0) console.log('[DarkCmds] AutoLoad (' + formType + '): ' + skipped + ' unidade(s) ignorada(s) por perfil ' + (formType === 'attack' ? 'defesa' : 'ataque'));
 
                 $(wndID + ' input.unit_input').each(function () {
                     $(this).trigger('keyup').trigger('change');
