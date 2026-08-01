@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Dark Commands
 // @namespace    https://github.com/
-// @version      1.4.7
+// @version      1.4.8
 // @author       Dark Rebel
 // @description  GPT Time/Rank hide, Chegada de Comandos, Salvar Tropas, AutoLoad, Login Diário
 // @match        https://*.grepolis.com/game/*
@@ -29,7 +29,7 @@
     const RESYNC_INTERVAL = 300;
     const VISUAL_WARN_SEC = 900;
     const SOUND_WARN_SEC = 120;
-    const VERSION = '1.4.7';
+    const VERSION = '1.4.8';
 
     // ========================
     // Audio (alertas sonoros)
@@ -60,8 +60,19 @@
     // ========================
     // Configurações (preferências salvas)
     // ========================
+    function _storageGet(key, def) {
+        try { if (typeof GM_getValue === 'function') return GM_getValue(key, def); } catch (e) {}
+        try { let v = localStorage.getItem('dark_cmds_' + key); return v === null ? def : v; } catch (e) {}
+        return def;
+    }
+
+    function _storageSet(key, val) {
+        try { if (typeof GM_setValue === 'function') { GM_setValue(key, val); return; } } catch (e) {}
+        try { localStorage.setItem('dark_cmds_' + key, val); } catch (e) {}
+    }
+
     function _loadOpts() {
-        try { return JSON.parse(GM_getValue('dark_ct_opts', '{}')); } catch (e) { return {}; }
+        try { return JSON.parse(_storageGet('dark_ct_opts', '{}')); } catch (e) { return {}; }
     }
 
     let OPTIONS = (function () {
@@ -77,27 +88,27 @@
     })();
 
     function saveOpts() {
-        try { GM_setValue('dark_ct_opts', JSON.stringify(OPTIONS)); } catch (e) { console.warn('[DarkCmds] saveOpts:', e.message); }
+        try { _storageSet('dark_ct_opts', JSON.stringify(OPTIONS)); } catch (e) { console.warn('[DarkCmds] saveOpts:', e.message); }
     }
 
     function _migrateOpts() {
         try {
-            let prev = GM_getValue('dark_ct_version', '');
+            let prev = _storageGet('dark_ct_version', '');
             if (prev === VERSION) return;
             if (OPTIONS.saveTroops === false && !_gptBotDetected()) {
                 OPTIONS.saveTroops = true;
                 saveOpts();
             }
-            GM_setValue('dark_ct_version', VERSION);
+            _storageSet('dark_ct_version', VERSION);
         } catch (e) { console.warn('[DarkCmds] migrate:', e.message); }
     }
 
     function _loadPanelPos() {
-        try { return JSON.parse(GM_getValue('dark_ct_panel_pos', 'null')); } catch (e) { return null; }
+        try { return JSON.parse(_storageGet('dark_ct_panel_pos', 'null')); } catch (e) { return null; }
     }
 
     function _savePanelPos(left, top) {
-        try { GM_setValue('dark_ct_panel_pos', JSON.stringify({ left: Math.round(left), top: Math.round(top) })); } catch (e) {}
+        try { _storageSet('dark_ct_panel_pos', JSON.stringify({ left: Math.round(left), top: Math.round(top) })); } catch (e) {}
     }
 
     // ========================
