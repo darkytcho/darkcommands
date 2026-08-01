@@ -8,6 +8,7 @@
     "identifierNamesGenerator": "mangled-shuffled",
     "renameGlobals": true,
     "selfDefending": false,
+    "seed": "dark-commands-seed",
     "stringArray": true,
     "stringArrayEncoding": ["base64"],
     "stringArrayThreshold": 0.75,
