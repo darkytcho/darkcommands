@@ -1,6 +1,6 @@
 {
   "name": "dark-commands",
-  "version": "1.5.0",
+  "version": "1.5.1",
   "description": "GPT Time/Rank hide, Chegada de Comandos, Salvar Tropas, AutoLoad, Login Diario",
   "private": true,
   "scripts": {
